@@ -3,7 +3,6 @@ package com.example.freizeittickettracker.data
 import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
-import java.time.LocalDate
 
 @Dao
 interface VisitDao {

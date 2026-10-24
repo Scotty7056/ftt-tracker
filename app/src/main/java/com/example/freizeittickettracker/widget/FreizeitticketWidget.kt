@@ -1,44 +1,51 @@
 package com.example.freizeittickettracker.widget
 
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
 import android.content.Context
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.glance.*
-import androidx.glance.action.actionStartActivity
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.*
-import androidx.glance.layout.*
-import androidx.glance.text.*
-import androidx.room.Room
+import android.content.Intent
+import android.widget.RemoteViews
+import com.example.freizeittickettracker.R
 import com.example.freizeittickettracker.data.AppDatabase
-import com.example.freizeittickettracker.data.TicketType
+import com.example.freizeittickettracker.data.TicketConfig
 import com.example.freizeittickettracker.ui.MainActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 
-class FreizeitticketWidget : GlanceAppWidget() {
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "freizeitticket_db").build()
-        val total = db.checkInDao().getTotalSaved().firstOrNull() ?: 0.0
-        val cost = TicketType.U23.presalePrice
-        val progress = if (cost > 0) (total / cost).toFloat().coerceIn(0f, 1f) else 0f
+class FreizeitticketWidget : AppWidgetProvider() {
 
-        provideContent {
-            GlanceTheme {
-                Column(
-                    modifier = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.surfaceVariant).cornerRadius(16.dp).padding(12.dp).clickable(actionStartActivity<MainActivity>()),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Freizeitticket Tirol", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GlanceTheme.colors.onSurfaceVariant))
-                    Spacer(GlanceModifier.height(6.dp))
-                    LinearProgressIndicator(progress = progress, modifier = GlanceModifier.fillMaxWidth().height(8.dp).cornerRadius(4.dp))
-                    Spacer(GlanceModifier.height(6.dp))
-                    Text("€ %.0f / € %.0f (%.0f%%)".format(total, cost, progress * 100), style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold))
-                }
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        val db = AppDatabase.getDatabase(context)
+        val visitDao = db.visitDao()
+        val configDao = db.configDao()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val visits = visitDao.getAllVisits().firstOrNull() ?: emptyList()
+            val configEntity = configDao.getConfig().firstOrNull()
+            val config = configEntity?.toModel() ?: TicketConfig()
+
+            val saved = visits.sumOf { it.savedAmount }
+            val price = config.getPrice()
+            val progress = if (price > 0) ((saved / price) * 100).toInt().coerceAtMost(100) else 0
+
+            for (appWidgetId in appWidgetIds) {
+                val views = RemoteViews(context.packageName, R.layout.widget_layout)
+                views.setTextViewText(R.id.widget_saved_value, "%.2f €".format(saved))
+                views.setTextViewText(R.id.widget_progress_text, "$progress% amortisiert")
+                views.setProgressBar(R.id.widget_progress_bar, 100, progress, false)
+
+                val intent = Intent(context, MainActivity::class.java)
+                val pendingIntent = PendingIntent.getActivity(
+                    context, 0, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
+
+                appWidgetManager.updateAppWidget(appWidgetId, views)
             }
         }
     }
-}
-
-class FreizeitticketWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = FreizeitticketWidget()
 }
