@@ -81,7 +81,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateLocation() {
-        // Lokations-Update anstoßen
+        // GPS-Aktualisierung
     }
 
     private fun notifyWidgetUpdate() {

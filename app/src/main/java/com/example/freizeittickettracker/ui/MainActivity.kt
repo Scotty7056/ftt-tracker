@@ -1,7 +1,11 @@
 package com.example.freizeittickettracker.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,9 +39,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.freizeittickettracker.R
 import com.example.freizeittickettracker.data.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.MapView
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
@@ -46,13 +52,12 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// Farbschema: Alpin modern
+// Alpin modern Farbpalette
 val AlpineDark = Color(0xFF0F1E2E)
 val AlpineNavy = Color(0xFF1B2E4B)
 val GlacierBlue = Color(0xFF0077B6)
 val FrostTeal = Color(0xFF00B4D8)
 val EmeraldGain = Color(0xFF10B981)
-val CoralWarning = Color(0xFFF43F5E)
 val CardSurface = Color(0xFFF8FAFC)
 
 class MainActivity : ComponentActivity() {
@@ -201,7 +206,6 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
-        // Hero-Amortisationskarte mit Farbverlauf
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -254,7 +258,6 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Großes zentrales Ersparnis-Highlight
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.Bottom,
@@ -324,7 +327,6 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
             }
         }
 
-        // Schnelle KPI-Kacheln
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricTile(
@@ -345,7 +347,6 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
             }
         }
 
-        // Primärer Call-to-Action
         item {
             Button(
                 onClick = { showAddVisitDialog = true },
@@ -558,7 +559,7 @@ fun CalendarView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 3. GOOGLE MAPS
+// 3. GOOGLE MAPS MIT CUSTOM BADGES
 // ==========================================
 @Composable
 fun MapOverviewView(viewModel: TrackerViewModel) {
@@ -582,19 +583,23 @@ fun MapOverviewView(viewModel: TrackerViewModel) {
             googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(innsbruck, 9.5f))
             googleMap.clear()
 
+            val skiIcon = bitmapDescriptorFromVector(context, R.drawable.ic_ski, android.graphics.Color.parseColor("#0077B6"))
+            val poolIcon = bitmapDescriptorFromVector(context, R.drawable.ic_pool, android.graphics.Color.parseColor("#00838F"))
+            val defaultIcon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+
             venues.forEach { venue ->
-                val markerColor = when (venue.category) {
-                    VenueCategory.SKI -> BitmapDescriptorFactory.HUE_AZURE
-                    VenueCategory.POOL -> BitmapDescriptorFactory.HUE_CYAN
-                    VenueCategory.ICE -> BitmapDescriptorFactory.HUE_VIOLET
-                    VenueCategory.CULTURE -> BitmapDescriptorFactory.HUE_ORANGE
+                val markerIcon = when (venue.category) {
+                    VenueCategory.SKI -> skiIcon
+                    VenueCategory.POOL -> poolIcon
+                    else -> defaultIcon
                 }
                 googleMap.addMarker(
                     MarkerOptions()
                         .position(LatLng(venue.latitude, venue.longitude))
                         .title(venue.name)
                         .snippet("Normaltarif: ${venue.normalTicketPrice.formatEuro()}")
-                        .icon(BitmapDescriptorFactory.defaultMarker(markerColor))
+                        .icon(markerIcon)
+                        .anchor(0.5f, 0.5f)
                 )
             }
         }
@@ -917,4 +922,37 @@ fun calculateDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
             Math.sin(dLon / 2) * Math.sin(dLon / 2)
     val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     return r * c
+}
+
+fun bitmapDescriptorFromVector(
+    context: Context,
+    vectorResId: Int,
+    backgroundColor: Int
+): BitmapDescriptor {
+    val sizePx = 96
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = backgroundColor
+        style = Paint.Style.FILL
+    }
+    val radius = sizePx / 2f
+    canvas.drawCircle(radius, radius, radius - 4f, paint)
+
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
+    canvas.drawCircle(radius, radius, radius - 4f, strokePaint)
+
+    val drawable = ContextCompat.getDrawable(context, vectorResId) ?: return BitmapDescriptorFactory.defaultMarker()
+    drawable.setTint(android.graphics.Color.WHITE)
+
+    val iconPadding = 22
+    drawable.setBounds(iconPadding, iconPadding, sizePx - iconPadding, sizePx - iconPadding)
+    drawable.draw(canvas)
+
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
 }

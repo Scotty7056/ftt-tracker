@@ -3,7 +3,7 @@ package com.example.freizeittickettracker.data
 object VenueCatalog {
     val venues: List<Venue> = listOf(
         // ==========================================
-        // 1. BERGBAHNEN & SKIGEBIETE (INNSBRUCK & UMGEBUNG / TIROL)
+        // 1. BERGBAHNEN & SKIGEBIETE
         // ==========================================
         Venue("ski_nordkette", "Innsbrucker Nordkettenbahnen", VenueCategory.SKI, 47.2865, 11.3989, 48.0, 1200),
         Venue("ski_patscherkofel", "Patscherkofelbahn Igls", VenueCategory.SKI, 47.2272, 11.4132, 45.0, 1000),
