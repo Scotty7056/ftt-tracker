@@ -21,15 +21,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -45,21 +46,30 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+// Farbschema: Alpin modern
+val AlpineDark = Color(0xFF0F1E2E)
+val AlpineNavy = Color(0xFF1B2E4B)
+val GlacierBlue = Color(0xFF0077B6)
+val FrostTeal = Color(0xFF00B4D8)
+val EmeraldGain = Color(0xFF10B981)
+val CoralWarning = Color(0xFFF43F5E)
+val CardSurface = Color(0xFFF8FAFC)
+
 class MainActivity : ComponentActivity() {
     private val viewModel: TrackerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme(
-                primary = Color(0xFF1E88E5),
-                secondary = Color(0xFF26A69A),
-                tertiary = Color(0xFFFFA000)
-            )) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
+            MaterialTheme(
+                colorScheme = lightColorScheme(
+                    primary = GlacierBlue,
+                    secondary = FrostTeal,
+                    surface = CardSurface,
+                    background = Color(0xFFF1F5F9)
+                )
+            ) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainScreen(viewModel)
                 }
             }
@@ -73,8 +83,8 @@ fun MainScreen(viewModel: TrackerViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showTarifDialog by remember { mutableStateOf(false) }
     val ticketConfig by viewModel.ticketConfig.collectAsState(initial = TicketConfig())
-
     val context = LocalContext.current
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -87,10 +97,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
             permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             )
         } else {
             viewModel.updateLocation()
@@ -100,46 +107,61 @@ fun MainScreen(viewModel: TrackerViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Freizeitticket Tracker", fontWeight = FontWeight.Bold) },
-                actions = {
-                    TextButton(onClick = { showTarifDialog = true }) {
-                        Icon(Icons.Default.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Mein Ticket")
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.DownhillSkiing,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Freizeitticket Tracker",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 19.sp
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                actions = {
+                    FilledTonalButton(
+                        onClick = { showTarifDialog = true },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.18f),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Rounded.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Tarif", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AlpineNavy)
             )
         },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
-                    label = { Text("Dashboard") }
+            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                val items = listOf(
+                    Triple(0, "Dashboard", Icons.Rounded.Dashboard),
+                    Triple(1, "Kalender", Icons.Rounded.CalendarMonth),
+                    Triple(2, "Karte", Icons.Rounded.Map),
+                    Triple(3, "Partner", Icons.Rounded.Explore)
                 )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "Kalender") },
-                    label = { Text("Kalender") }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Default.Map, contentDescription = "Karte") },
-                    label = { Text("Karte") }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    icon = { Icon(Icons.Default.List, contentDescription = "Partner") },
-                    label = { Text("Partner") }
-                )
+                items.forEach { (index, label, icon) ->
+                    NavigationBarItem(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        icon = { Icon(icon, contentDescription = label) },
+                        label = { Text(label, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = GlacierBlue,
+                            indicatorColor = GlacierBlue.copy(alpha = 0.12f)
+                        )
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -166,7 +188,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 1. DASHBOARD
+// 1. DASHBOARD REDESIGN
 // ==========================================
 @Composable
 fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
@@ -175,53 +197,126 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
     var showAddVisitDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(vertical = 16.dp)
     ) {
+        // Hero-Amortisationskarte mit Farbverlauf
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${stats.tarifTitle} (${stats.purchasePrice.formatEuro()})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                Box(
+                    modifier = Modifier
+                        .background(
+                            Brush.linearGradient(
+                                colors = if (stats.isAmortized)
+                                    listOf(Color(0xFF0F3E2E), EmeraldGain)
+                                else
+                                    listOf(AlpineDark, AlpineNavy, GlacierBlue)
+                            )
                         )
-                        IconButton(onClick = onOpenTarifDialog) {
-                            Icon(Icons.Default.Edit, contentDescription = "Tarif ändern")
+                        .padding(20.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = stats.tarifTitle.uppercase(Locale.GERMAN),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Kaufpreis: ${stats.purchasePrice.formatEuro()}",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
+                            IconButton(
+                                onClick = onOpenTarifDialog,
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .size(36.dp)
+                            ) {
+                                Icon(Icons.Rounded.Edit, contentDescription = "Bearbeiten", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)),
-                        color = if (stats.isAmortized) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary
-                    )
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Eingefahren:", style = MaterialTheme.typography.bodySmall)
-                            Text(stats.totalValueSaved.formatEuro(), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                        // Großes zentrales Ersparnis-Highlight
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    "EINGEFAHRENER WERT",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.75f),
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    stats.totalValueSaved.formatEuro(),
+                                    fontSize = 34.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (stats.isAmortized) EmeraldGain else Color.White.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    "${(stats.amortizationProgress * 100).toInt()}%",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(if (stats.isAmortized) "Reiner Gewinn:" else "Noch offen:", style = MaterialTheme.typography.bodySmall)
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        LinearProgressIndicator(
+                            progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = if (stats.isAmortized) EmeraldGain else FrostTeal,
+                            trackColor = Color.White.copy(alpha = 0.25f)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                if (stats.isAmortized) "+${stats.netSavings.formatEuro()}" else stats.remainingToAmortize.formatEuro(),
+                                if (stats.isAmortized) "🎉 Ticket voll amortisiert!" else "Noch offen zum Break-Even:",
+                                fontSize = 13.sp,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                            Text(
+                                if (stats.isAmortized) "+${stats.netSavings.formatEuro()} Plus" else stats.remainingToAmortize.formatEuro(),
                                 fontWeight = FontWeight.Bold,
-                                color = if (stats.isAmortized) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
+                                fontSize = 13.sp,
+                                color = if (stats.isAmortized) EmeraldGain else Color(0xFFFFD166)
                             )
                         }
                     }
@@ -229,49 +324,77 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
             }
         }
 
+        // Schnelle KPI-Kacheln
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Card(modifier = Modifier.weight(1f)) {
-                    Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Besuche", style = MaterialTheme.typography.bodyMedium)
-                        Text("${stats.totalVisits}", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Card(modifier = Modifier.weight(1f)) {
-                    Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Quote", style = MaterialTheme.typography.bodyMedium)
-                        Text("${(stats.amortizationProgress * 100).toInt()}%", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile(
+                    title = "Ausflüge",
+                    value = "${stats.totalVisits}",
+                    icon = Icons.Rounded.EventAvailable,
+                    tint = GlacierBlue,
+                    modifier = Modifier.weight(1f)
+                )
+                val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
+                MetricTile(
+                    title = "Ø Ersparnis/Tag",
+                    value = avg.formatEuro(),
+                    icon = Icons.Rounded.TrendingUp,
+                    tint = EmeraldGain,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
+        // Primärer Call-to-Action
         item {
             Button(
                 onClick = { showAddVisitDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
             ) {
-                Icon(Icons.Default.AddLocationAlt, contentDescription = null)
+                Icon(Icons.Rounded.AddLocationAlt, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Besuch manuell erfassen")
+                Text("Besuch manuell eintragen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         item {
-            Text("Letzte Aktivitäten", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Letzte Aktivitäten", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
         }
 
         if (visits.isEmpty()) {
             item {
-                Text(
-                    "Noch keine Besuche erfasst. Besuche ein Skigebiet oder Hallenbad oder trage manuell einen Ausflug ein!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Rounded.Hiking, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            "Noch keine Ausflüge erfasst",
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.Gray
+                        )
+                        Text(
+                            "Tippe oben auf 'Besuch manuell eintragen'",
+                            fontSize = 12.sp,
+                            color = Color.LightGray
+                        )
+                    }
+                }
             }
         } else {
             items(visits) { visit ->
-                VisitItemCard(visit = visit, onDelete = { viewModel.deleteVisit(visit) })
+                ModernVisitCard(visit = visit, onDelete = { viewModel.deleteVisit(visit) })
             }
         }
     }
@@ -288,8 +411,35 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
     }
 }
 
+@Composable
+fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(title, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+            }
+        }
+    }
+}
+
 // ==========================================
-// 2. KALENDER
+// 2. KALENDER REDESIGN
 // ==========================================
 @Composable
 fun CalendarView(viewModel: TrackerViewModel) {
@@ -299,7 +449,7 @@ fun CalendarView(viewModel: TrackerViewModel) {
 
     val daysInMonth = remember(currentMonth) {
         val firstDay = currentMonth.atDay(1)
-        val firstDayOfWeek = firstDay.dayOfWeek.value // 1 = Mo, 7 = So
+        val firstDayOfWeek = firstDay.dayOfWeek.value
         val length = currentMonth.lengthOfMonth()
         val days = mutableListOf<LocalDate?>()
         for (i in 1 until firstDayOfWeek) days.add(null)
@@ -307,89 +457,100 @@ fun CalendarView(viewModel: TrackerViewModel) {
         days
     }
 
-    val visitDates = remember(visits) {
-        visits.map { it.date }.toSet()
-    }
+    val visitDates = remember(visits) { visits.map { it.date }.toSet() }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
         ) {
-            IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "Vormonat")
-            }
-            Text(
-                text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "Nächster Monat")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-            listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So").forEach {
-                Text(it, fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 12.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(7),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(daysInMonth) { date ->
-                if (date != null) {
-                    val hasVisit = visitDates.contains(date)
-                    val isSelected = date == selectedDate
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1f)
-                            .padding(2.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
-                                    hasVisit -> Color(0xFFC8E6C9)
-                                    else -> Color.Transparent
-                                }
-                            )
-                            .clickable { selectedDate = date },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "${date.dayOfMonth}",
-                            fontWeight = if (hasVisit || isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (hasVisit) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
-                        )
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Zurück")
                     }
-                } else {
-                    Spacer(modifier = Modifier.aspectRatio(1f))
+                    Text(
+                        text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AlpineDark
+                    )
+                    IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Vor")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                    listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So").forEach {
+                        Text(it, fontWeight = FontWeight.SemiBold, color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.fillMaxWidth()) {
+                    items(daysInMonth) { date ->
+                        if (date != null) {
+                            val hasVisit = visitDates.contains(date)
+                            val isSelected = date == selectedDate
+                            Box(
+                                modifier = Modifier
+                                    .aspectRatio(1f)
+                                    .padding(3.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        when {
+                                            isSelected -> GlacierBlue
+                                            hasVisit -> EmeraldGain.copy(alpha = 0.25f)
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                                    .clickable { selectedDate = date },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${date.dayOfMonth}",
+                                    fontWeight = if (hasVisit || isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = when {
+                                        isSelected -> Color.White
+                                        hasVisit -> EmeraldGain
+                                        else -> AlpineDark
+                                    },
+                                    fontSize = 13.sp
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.aspectRatio(1f))
+                        }
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Divider()
-        Spacer(modifier = Modifier.height(8.dp))
-
         Text(
-            "Besuche am ${selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN))}:",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
+            "Ausflüge am ${selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN))}",
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = AlpineDark
         )
 
         val selectedVisits = visits.filter { it.date == selectedDate }
         if (selectedVisits.isEmpty()) {
-            Text("Keine Einträge für diesen Tag.", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+            Text("Kein Ausflug an diesem Tag eingetragen.", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
         } else {
-            LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(selectedVisits) { visit ->
-                    VisitItemCard(visit = visit, onDelete = { viewModel.deleteVisit(visit) })
+                    ModernVisitCard(visit = visit, onDelete = { viewModel.deleteVisit(visit) })
                 }
             }
         }
@@ -397,7 +558,7 @@ fun CalendarView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 3. GOOGLE MAPS KARTENÜBERSICHT
+// 3. GOOGLE MAPS
 // ==========================================
 @Composable
 fun MapOverviewView(viewModel: TrackerViewModel) {
@@ -419,20 +580,20 @@ fun MapOverviewView(viewModel: TrackerViewModel) {
             googleMap.uiSettings.isZoomControlsEnabled = true
             val innsbruck = LatLng(47.2692, 11.4041)
             googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(innsbruck, 9.5f))
-
             googleMap.clear()
+
             venues.forEach { venue ->
                 val markerColor = when (venue.category) {
                     VenueCategory.SKI -> BitmapDescriptorFactory.HUE_AZURE
-                    VenueCategory.POOL -> BitmapDescriptorFactory.HUE_BLUE
-                    VenueCategory.ICE -> BitmapDescriptorFactory.HUE_CYAN
+                    VenueCategory.POOL -> BitmapDescriptorFactory.HUE_CYAN
+                    VenueCategory.ICE -> BitmapDescriptorFactory.HUE_VIOLET
                     VenueCategory.CULTURE -> BitmapDescriptorFactory.HUE_ORANGE
                 }
                 googleMap.addMarker(
                     MarkerOptions()
                         .position(LatLng(venue.latitude, venue.longitude))
                         .title(venue.name)
-                        .snippet("Tagestarif: ${venue.normalTicketPrice.formatEuro()}")
+                        .snippet("Normaltarif: ${venue.normalTicketPrice.formatEuro()}")
                         .icon(BitmapDescriptorFactory.defaultMarker(markerColor))
                 )
             }
@@ -441,7 +602,7 @@ fun MapOverviewView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 4. PARTNERLISTE & WETTER
+// 4. PARTNERLISTE REDESIGN
 // ==========================================
 @Composable
 fun PartnerListView(viewModel: TrackerViewModel) {
@@ -461,56 +622,78 @@ fun PartnerListView(viewModel: TrackerViewModel) {
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Skigebiet, Bad oder Museum suchen...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true
+            shape = RoundedCornerShape(16.dp),
+            placeholder = { Text("Gebiet, Bad oder Museum suchen...") },
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = GlacierBlue) },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = GlacierBlue
+            )
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            FilterChip(
-                selected = selectedCategory == null,
-                onClick = { selectedCategory = null },
-                label = { Text("Alle") }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val filters = listOf(
+                null to "Alle",
+                VenueCategory.SKI to "⛷ Ski",
+                VenueCategory.POOL to "🏊 Bäder",
+                VenueCategory.CULTURE to "🏛 Kultur"
             )
-            FilterChip(
-                selected = selectedCategory == VenueCategory.SKI,
-                onClick = { selectedCategory = VenueCategory.SKI },
-                label = { Text("Ski") }
-            )
-            FilterChip(
-                selected = selectedCategory == VenueCategory.POOL,
-                onClick = { selectedCategory = VenueCategory.POOL },
-                label = { Text("Bäder") }
-            )
-            FilterChip(
-                selected = selectedCategory == VenueCategory.CULTURE,
-                onClick = { selectedCategory = VenueCategory.CULTURE },
-                label = { Text("Kultur") }
-            )
+            filters.forEach { (cat, label) ->
+                FilterChip(
+                    selected = selectedCategory == cat,
+                    onClick = { selectedCategory = cat },
+                    label = { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium) },
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(filteredVenues) { venue ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
                     Row(
-                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        modifier = Modifier.padding(14.dp).fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(venue.name, fontWeight = FontWeight.Bold)
-                            Text("Normalpreis: ${venue.normalTicketPrice.formatEuro()}", style = MaterialTheme.typography.bodySmall)
-                            userLocation?.let { loc ->
-                                val dist = calculateDistanceKm(loc.latitude, loc.longitude, venue.latitude, venue.longitude)
-                                Text("Entfernung: ${"%.1f".format(dist)} km", fontSize = 11.sp, color = Color.Gray)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CategoryBadge(venue.category)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Tageskarte: ${venue.normalTicketPrice.formatEuro()}",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+                        userLocation?.let { loc ->
+                            val dist = calculateDistanceKm(loc.latitude, loc.longitude, venue.latitude, venue.longitude)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFF1F5F9)
+                            ) {
+                                Text(
+                                    "${"%.0f".format(dist)} km",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GlacierBlue,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
                             }
                         }
                     }
@@ -521,30 +704,78 @@ fun PartnerListView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// HILFSKOMPONENTEN & DIALOGE
+// KARTEN & BADGES
 // ==========================================
 @Composable
-fun VisitItemCard(visit: VisitEntity, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+fun CategoryBadge(category: VenueCategory) {
+    val (label, bg, fg) = when (category) {
+        VenueCategory.SKI -> Triple("Ski", Color(0xFFE0F2FE), GlacierBlue)
+        VenueCategory.POOL -> Triple("Bad", Color(0xFFE0F7FA), Color(0xFF00838F))
+        VenueCategory.ICE -> Triple("Eis", Color(0xFFEDE7F6), Color(0xFF5E35B1))
+        VenueCategory.CULTURE -> Triple("Kultur", Color(0xFFFFF3E0), Color(0xFFD84315))
+    }
+    Surface(shape = RoundedCornerShape(6.dp), color = bg) {
+        Text(
+            label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier.padding(14.dp).fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(visit.venueName, fontWeight = FontWeight.SemiBold)
-                Text(visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(EmeraldGain.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = EmeraldGain, modifier = Modifier.size(22.dp))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(visit.venueName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                    Text(
+                        visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("+${visit.savedAmount.formatEuro()}", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                Text(
+                    "+${visit.savedAmount.formatEuro()}",
+                    fontWeight = FontWeight.Black,
+                    color = EmeraldGain,
+                    fontSize = 15.sp
+                )
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.DeleteOutline, contentDescription = "Löschen", tint = Color.Gray)
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "Löschen", tint = Color.LightGray, modifier = Modifier.size(20.dp))
                 }
             }
         }
     }
 }
 
+// ==========================================
+// DIALOGE
+// ==========================================
 @Composable
 fun ManualVisitDialog(
     venues: List<Venue>,
@@ -553,28 +784,51 @@ fun ManualVisitDialog(
 ) {
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var notes by remember { mutableStateOf("") }
+    var filterText by remember { mutableStateOf("") }
+
+    val displayedVenues = remember(filterText) {
+        if (filterText.isEmpty()) venues.take(6)
+        else venues.filter { it.name.contains(filterText, ignoreCase = true) }.take(6)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Besuch manuell eintragen") },
+        title = { Text("Besuch manuell eintragen", fontWeight = FontWeight.Bold) },
         text = {
-            Column {
-                Text("Zielort wählen:")
-                venues.take(6).forEach { v ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = filterText,
+                    onValueChange = { filterText = it },
+                    placeholder = { Text("Gebiet suchen...", fontSize = 13.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                displayedVenues.forEach { v ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().clickable { selectedVenue = v }.padding(vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { selectedVenue = v }
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedVenue.id == v.id, onClick = { selectedVenue = v })
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(v.name, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(v.name, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text("Ersparnis: ${v.normalTicketPrice.formatEuro()}", fontSize = 11.sp, color = Color.Gray)
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(selectedVenue, LocalDate.now(), notes) }) {
-                Text("Eintragen")
+            Button(
+                onClick = { onConfirm(selectedVenue, LocalDate.now(), notes) },
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+            ) {
+                Text("Jetzt einbuchen")
             }
         },
         dismissButton = {
@@ -594,28 +848,55 @@ fun TarifSelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ticket Tarif wählen") },
+        title = { Text("Ticket-Tarif anpassen", fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isEarlyBird, onCheckedChange = { isEarlyBird = it })
-                    Text("Vorverkaufstarif")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                TarifCategory.values().forEach { category ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().clickable { selectedCategory = category }.padding(vertical = 2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isEarlyBird = !isEarlyBird }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = isEarlyBird, onCheckedChange = { isEarlyBird = it })
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Günstigerer Preis bei Kauf vor Saisonstart", fontSize = 11.sp, color = Color.Gray)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                for (category in TarifCategory.entries) {
+                    val price = if (isEarlyBird) category.earlyBirdPrice else category.normalPrice
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { selectedCategory = category }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedCategory == category, onClick = { selectedCategory = category })
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(category.label, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(category.label, fontSize = 13.sp)
+                            Text(price.formatEuro(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineDark)
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(TicketConfig(category = selectedCategory, isEarlyBird = isEarlyBird)) }) {
+            Button(
+                onClick = { onSave(TicketConfig(category = selectedCategory, isEarlyBird = isEarlyBird)) },
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+            ) {
                 Text("Speichern")
             }
         },
