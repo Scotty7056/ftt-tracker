@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- Hinterer Berg (Gletscherblau) -->
+  <path
+      android:fillColor="#0077B6"
+      android:pathData="M62,34L88,74H36z"/>
+  <path
+      android:fillColor="#90E0EF"
+      android:pathData="M62,34L71,48L64,52L59,48z"/>
+
+  <!-- Vorderer Berg (Alpinblau mit Schneekappe) -->
+  <path
+      android:fillColor="#00B4D8"
+      android:pathData="M38,42L66,80H10z"/>
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M38,42L48,56L42,60L35,55z"/>
+
+  <!-- Dynamische Skispur (Gold) -->
+  <path
+      android:fillColor="#FFA000"
+      android:pathData="M24,78 C42,72 58,78 84,68 C80,66 74,68 60,71 C44,74 34,70 24,78 Z"/>
+</vector>
