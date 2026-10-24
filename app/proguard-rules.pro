@@ -1,0 +1,3 @@
+﻿-keepclassmembers class * extends androidx.room.RoomDatabase { <init>(); }
+-keepattributes *Annotation*, InnerClasses
+-keep class io.ktor.** { *; }
