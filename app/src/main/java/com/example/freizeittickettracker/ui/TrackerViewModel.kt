@@ -1,4 +1,4 @@
-﻿package com.example.freizeittickettracker.ui
+package com.example.freizeittickettracker.ui
 
 import android.location.Location
 import androidx.lifecycle.ViewModel

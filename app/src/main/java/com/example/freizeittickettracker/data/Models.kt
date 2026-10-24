@@ -1,4 +1,4 @@
-﻿package com.example.freizeittickettracker.data
+package com.example.freizeittickettracker.data
 
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
@@ -8,16 +8,16 @@ import java.time.ZoneId
 
 enum class Category(val displayName: String) {
     SKI("Skigebiete & Bergbahnen"),
-    SWIMMING("Hallen- & FreibÃ¤der"),
+    SWIMMING("Hallen- & Freibäder"),
     LAKE("Badeseen"),
-    ICE_SKATING("EislaufplÃ¤tze"),
+    ICE_SKATING("Eislaufplätze"),
     CULTURE("Museen & Kultur")
 }
 
 enum class TicketType(val label: String, val presalePrice: Double, val regularPrice: Double) {
-    ADULT("Erwachsene (1962â€“2002)", 789.0, 908.0),
-    U23("U23 (2003â€“2007)", 710.0, 817.0),
-    YOUTH("Jugend (2008â€“2010)", 631.0, 725.0),
+    ADULT("Erwachsene (1962–2002)", 789.0, 908.0),
+    U23("U23 (2003–2007)", 710.0, 817.0),
+    YOUTH("Jugend (2008–2010)", 631.0, 725.0),
     CHILD("Kinder (ab 2011)", 410.0, 472.0),
     SENIOR("Senioren (ab 1961)", 750.0, 862.0),
     DISABLED("Menschen mit Behinderung", 592.0, 681.0)
@@ -46,8 +46,8 @@ data class Venue(
 }
 
 enum class Season(val displayName: String) {
-    WINTER("Winter (Okt â€“ Apr)"),
-    SUMMER("Sommer (Mai â€“ Okt)");
+    WINTER("Winter (Okt – Apr)"),
+    SUMMER("Sommer (Mai – Okt)");
 
     companion object {
         fun fromTimestamp(epochMillis: Long): Season {

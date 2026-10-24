@@ -1,4 +1,4 @@
-﻿package com.example.freizeittickettracker.util
+package com.example.freizeittickettracker.util
 
 import android.annotation.SuppressLint
 import android.content.Context

@@ -1,4 +1,4 @@
-﻿package com.example.freizeittickettracker.widget
+package com.example.freizeittickettracker.widget
 
 import android.content.Context
 import androidx.compose.ui.unit.dp
@@ -32,7 +32,7 @@ class FreizeitticketWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.height(6.dp))
                     LinearProgressIndicator(progress = progress, modifier = GlanceModifier.fillMaxWidth().height(8.dp).cornerRadius(4.dp))
                     Spacer(GlanceModifier.height(6.dp))
-                    Text("â‚¬ %.0f / â‚¬ %.0f (%.0f%%)".format(total, cost, progress * 100), style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                    Text("€ %.0f / € %.0f (%.0f%%)".format(total, cost, progress * 100), style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold))
                 }
             }
         }

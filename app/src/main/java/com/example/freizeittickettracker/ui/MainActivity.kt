@@ -1,4 +1,4 @@
-﻿package com.example.freizeittickettracker.ui
+package com.example.freizeittickettracker.ui
 
 import android.Manifest
 import android.os.Bundle
@@ -99,9 +99,9 @@ fun DashboardTab(viewModel: TrackerViewModel, state: UiState, modifier: Modifier
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("In deiner NÃ¤he (ca. %.0fm): %s".format(dist, venue.name), fontWeight = FontWeight.Bold)
+                        Text("In deiner Nähe (ca. %.0fm): %s".format(dist, venue.name), fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        Button(onClick = { viewModel.recordVisit(venue) }) { Text("Jetzt fÃ¼r â‚¬ %.2f einbuchen".format(venue.getPriceFor(state.selectedTicketType))) }
+                        Button(onClick = { viewModel.recordVisit(venue) }) { Text("Jetzt für € %.2f einbuchen".format(venue.getPriceFor(state.selectedTicketType))) }
                     }
                 }
             }
@@ -110,13 +110,13 @@ fun DashboardTab(viewModel: TrackerViewModel, state: UiState, modifier: Modifier
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("${state.selectedTicketType.label} (Kaufpreis: â‚¬ %.2f)".format(state.ticketCost), style = MaterialTheme.typography.labelLarge)
+                    Text("${state.selectedTicketType.label} (Kaufpreis: € %.2f)".format(state.ticketCost), style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth().height(10.dp))
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Genutzt: â‚¬ %.2f".format(state.totalSaved), fontWeight = FontWeight.Bold)
-                        Text(if (state.balance >= 0) "Gewinn: â‚¬ %.2f".format(state.balance) else "Offen: â‚¬ %.2f".format(kotlin.math.abs(state.balance)), color = if (state.balance >= 0) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        Text("Genutzt: € %.2f".format(state.totalSaved), fontWeight = FontWeight.Bold)
+                        Text(if (state.balance >= 0) "Gewinn: € %.2f".format(state.balance) else "Offen: € %.2f".format(kotlin.math.abs(state.balance)), color = if (state.balance >= 0) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -133,8 +133,8 @@ fun DashboardTab(viewModel: TrackerViewModel, state: UiState, modifier: Modifier
                         Text(checkIn.venueName, fontWeight = FontWeight.Bold)
                         Text(checkIn.category, style = MaterialTheme.typography.bodySmall)
                     }
-                    Text("+ â‚¬ %.2f".format(checkIn.savedAmount), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    IconButton(onClick = { viewModel.removeVisit(checkIn) }) { Icon(Icons.Default.Delete, "LÃ¶schen") }
+                    Text("+ € %.2f".format(checkIn.savedAmount), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    IconButton(onClick = { viewModel.removeVisit(checkIn) }) { Icon(Icons.Default.Delete, "Löschen") }
                 }
             }
         }
@@ -155,7 +155,7 @@ fun PartnerListTab(viewModel: TrackerViewModel, state: UiState, modifier: Modifi
                     Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(venue.name, fontWeight = FontWeight.Bold)
-                            Text("${venue.category.displayName} â€¢ â‚¬ %.2f".format(venue.getPriceFor(state.selectedTicketType)), style = MaterialTheme.typography.bodySmall)
+                            Text("${venue.category.displayName} • € %.2f".format(venue.getPriceFor(state.selectedTicketType)), style = MaterialTheme.typography.bodySmall)
                         }
                         Button(onClick = { viewModel.recordVisit(venue) }) { Text("Einbuchen") }
                     }
@@ -172,7 +172,7 @@ fun TicketSettingsDialog(current: TicketType, presale: Boolean, onDismiss: () ->
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ticket Tarif wÃ¤hlen") },
+        title = { Text("Ticket Tarif wählen") },
         text = {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {

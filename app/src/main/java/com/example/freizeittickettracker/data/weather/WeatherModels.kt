@@ -1,4 +1,4 @@
-﻿package com.example.freizeittickettracker.data.weather
+package com.example.freizeittickettracker.data.weather
 
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -61,7 +61,7 @@ class WeatherRepository {
                 0 -> "Klar / Sonnig"
                 1, 2, 3 -> "Heiter bis wolkig"
                 71, 73, 75, 85, 86 -> "Schneefall"
-                else -> "BewÃ¶lkt"
+                else -> "Bewölkt"
             },
             windSpeedKmh = cur.windSpeed,
             todaySnowfallCm = res.daily?.snowfallSum?.firstOrNull() ?: 0.0
