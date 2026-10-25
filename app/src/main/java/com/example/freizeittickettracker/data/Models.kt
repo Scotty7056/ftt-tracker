@@ -4,6 +4,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.time.LocalDate
 
+fun Double.formatEuro(): String = "%.2f €".format(this)
+
 enum class VenueCategory(val displayName: String, val iconLabel: String) {
     SKI("Skigebiet / Bergbahn", "⛷️ Ski"),
     SLED("Rodelbahn", "🛷 Rodeln"),

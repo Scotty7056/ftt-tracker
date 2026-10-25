@@ -1,4 +1,3 @@
-﻿<resources>
-    <string name="app_name">Freizeitticket Tracker</string>
-    <string name="widget_description">Amortisation &amp; 1-Tap Check-In</string>
+<resources>
+    <string name="app_name">FTT Tracker</string>
 </resources>

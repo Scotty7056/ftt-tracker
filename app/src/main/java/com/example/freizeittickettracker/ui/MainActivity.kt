@@ -224,7 +224,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Freizeitticket Tracker",
+                            "FTT Tracker",
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 18.sp,
