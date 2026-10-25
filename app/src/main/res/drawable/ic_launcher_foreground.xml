@@ -3,26 +3,37 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    
+    <!-- Großer Berg (Hintergrund-Gipfel) -->
+    <path
+        android:pathData="M38,68 L54,38 L70,68 Z"
+        android:fillColor="#0077B6" />
+        
+    <!-- Schneehaube großer Berg -->
+    <path
+        android:pathData="M54,38 L48,49 L52,47 L56,50 L60,49 Z"
+        android:fillColor="#FFFFFF" />
 
-  <!-- Nebengipfel rechts (Gletscherblau) -->
-  <path
-      android:fillColor="#0077B6"
-      android:pathData="M64,36 L90,76 L38,76 Z"/>
-  <path
-      android:fillColor="#90E0EF"
-      android:pathData="M64,36 L73,50 L66,54 L61,50 Z"/>
+    <!-- Vorderer Berg (Hauptgipfel) -->
+    <path
+        android:pathData="M24,72 L46,32 L68,72 Z"
+        android:fillColor="#00B4D8" />
 
-  <!-- Hauptmassiv links (Cyan / Türkis) -->
-  <path
-      android:fillColor="#00B4D8"
-      android:pathData="M38,30 L68,76 L8,76 Z"/>
-  <!-- Schneekappe weiß -->
-  <path
-      android:fillColor="#FFFFFF"
-      android:pathData="M38,30 L49,47 L43,51 L36,46 L30,50 L27,47 Z"/>
+    <!-- Schneehaube vorderer Berg -->
+    <path
+        android:pathData="M46,32 L38,47 L43,44 L49,48 L54,46 Z"
+        android:fillColor="#FFFFFF" />
 
-  <!-- Dynamischer Ticket- & Skischwung (Goldgelb) -->
-  <path
-      android:fillColor="#FFA000"
-      android:pathData="M20,78 C38,68 62,80 88,64 C82,62 76,64 62,69 C46,74 34,70 20,78 Z"/>
+    <!-- Dynamischer Ski-Schwung / Ticket-Bogen -->
+    <path
+        android:pathData="M30,76 C45,76 65,70 82,52"
+        android:strokeWidth="4"
+        android:strokeColor="#10B981"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M34,80 C48,80 66,74 80,60"
+        android:strokeWidth="2.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
 </vector>
