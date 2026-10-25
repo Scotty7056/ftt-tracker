@@ -984,10 +984,31 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
                     userLocationMarker = null
 
                     venues.forEach { venue ->
-                        val marker = Marker(this)
+                        val marker = object : Marker(this) {
+                            override fun onLongPress(event: android.view.MotionEvent?, mapView: MapView?): Boolean {
+                                val touched = hitTest(event, mapView)
+                                if (touched) {
+                                    mapView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                    viewModel.recordVisit(
+                                        venue = venue,
+                                        date = LocalDate.now(),
+                                        notes = "Per Schnellbuchung (Pin) erfasst"
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        "⚡ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) direkt eingebucht!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    closeInfoWindow()
+                                    return true
+                                }
+                                return super.onLongPress(event, mapView)
+                            }
+                        }
+
                         marker.position = GeoPoint(venue.latitude, venue.longitude)
                         marker.title = venue.name
-                        marker.snippet = "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n(Lange drücken zum Einbuchen)"
+                        marker.snippet = "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
 
                         val (pinColor, emoji) = when (venue.category) {
                             VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
@@ -999,21 +1020,40 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
                         marker.icon = createOsmMarkerDrawable(context, emoji, pinColor)
                         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
+                        // InfoWindow für Klick / LongClick
                         marker.infoWindow = object : org.osmdroid.views.overlay.infowindow.BasicInfoWindow(
                             org.osmdroid.library.R.layout.bonuspack_bubble,
                             this
                         ) {
                             override fun onOpen(item: Any?) {
                                 super.onOpen(item)
-                                mView?.setOnLongClickListener { v ->
-                                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                mView?.isClickable = true
+                                mView?.isLongClickable = true
+
+                                val triggerBooking = {
+                                    mView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
                                     viewModel.recordVisit(
                                         venue = venue,
                                         date = LocalDate.now(),
-                                        notes = "Per Schnellbuchung (Karte) erfasst"
+                                        notes = "Per Schnellbuchung (Bubble) erfasst"
                                     )
-                                    Toast.makeText(context, "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) direkt eingebucht!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) eingebucht!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                     close()
+                                }
+
+                                mView?.setOnLongClickListener {
+                                    triggerBooking()
+                                    true
+                                }
+
+                                val bubbleText = mView?.findViewById<android.widget.TextView>(org.osmdroid.library.R.id.bubble_description)
+                                bubbleText?.isLongClickable = true
+                                bubbleText?.setOnLongClickListener {
+                                    triggerBooking()
                                     true
                                 }
                             }
