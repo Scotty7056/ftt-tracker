@@ -4,11 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.time.LocalDate
 
-enum class VenueCategory(val displayName: String) {
-    SKI("Skigebiet"),
-    POOL("Bad / See"),
-    ICE("Eissport"),
-    CULTURE("Kultur")
+enum class VenueCategory(val displayName: String, val iconLabel: String) {
+    SKI("Skigebiet / Bergbahn", "⛷️ Ski"),
+    SLED("Rodelbahn", "🛷 Rodeln"),
+    ICE("Eislaufen / Eissport", "⛸️ Eislaufen"),
+    POOL("Hallenbad / Badesee", "🏊 Bäder"),
+    CULTURE("Kultur & Sehenswürdigkeit", "🏛️ Kultur")
 }
 
 data class Venue(
@@ -18,7 +19,8 @@ data class Venue(
     val latitude: Double,
     val longitude: Double,
     val normalTicketPrice: Double,
-    val geofenceRadiusMeters: Int = 1000
+    val geofenceRadiusMeters: Int = 1000,
+    val subtitle: String = ""
 )
 
 enum class TarifCategory(val label: String, val normalPrice: Double, val earlyBirdPrice: Double) {
