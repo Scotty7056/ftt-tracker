@@ -29,12 +29,14 @@ class AppGeofenceManager(private val context: Context) {
                 .setRequestId(venue.id)
                 .setCircularRegion(venue.latitude, venue.longitude, venue.geofenceRadiusMeters.toFloat())
                 .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+                // Smarte Entprellung: Benachrichtigung erst nach 15 Minuten Verweildauer
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_DWELL)
+                .setLoiteringDelay(900000) // 15 Min Verweildauer (verhindert Autobahn-Fehlalarme)
                 .build()
         }
 
         val request = GeofencingRequest.Builder()
-            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_DWELL)
             .addGeofences(geofences)
             .build()
 

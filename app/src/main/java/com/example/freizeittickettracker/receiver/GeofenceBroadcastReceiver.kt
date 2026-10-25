@@ -24,7 +24,10 @@ import java.time.LocalDate
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
-        if (event.hasError() || event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_ENTER) return
+        if (event.hasError()) return
+
+        val transition = event.geofenceTransition
+        if (transition != Geofence.GEOFENCE_TRANSITION_ENTER && transition != Geofence.GEOFENCE_TRANSITION_DWELL) return
 
         val triggeredGeofences = event.triggeringGeofences ?: return
         val venueId = triggeredGeofences.firstOrNull()?.requestId ?: return

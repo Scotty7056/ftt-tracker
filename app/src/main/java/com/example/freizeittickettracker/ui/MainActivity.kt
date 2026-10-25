@@ -2,6 +2,7 @@ package com.example.freizeittickettracker.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -9,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -39,9 +41,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -57,6 +61,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -82,9 +87,7 @@ val CoralWarning = Color(0xFFE53935)
 val CardSurface = Color(0xFFF8FAFC)
 
 @Serializable
-data class OpenMeteoResponse(
-    val current: CurrentWeather? = null
-)
+data class OpenMeteoResponse(val current: CurrentWeather? = null)
 
 @Serializable
 data class CurrentWeather(
@@ -103,7 +106,7 @@ class MainActivity : ComponentActivity() {
 
         val osmConfig = Configuration.getInstance()
         osmConfig.load(this, PreferenceManager.getDefaultSharedPreferences(this))
-        osmConfig.userAgentValue = "FTTTracker/1.1 (Android; contact: info@ftt-tracker.local)"
+        osmConfig.userAgentValue = "FTTTracker/1.2 (Android; contact: info@ftt-tracker.local)"
         
         val osmCacheDir = File(cacheDir, "osm_topo_tiles")
         if (!osmCacheDir.exists()) osmCacheDir.mkdirs()
@@ -140,6 +143,8 @@ fun MainScreen(viewModel: TrackerViewModel) {
     var showBackgroundRationaleDialog by remember { mutableStateOf(false) }
 
     val ticketConfig by viewModel.ticketConfig.collectAsState(initial = TicketConfig())
+    val selectedSeason by viewModel.selectedSeason.collectAsState()
+    val availableSeasons by viewModel.availableSeasons.collectAsState(initial = listOf(selectedSeason))
     val context = LocalContext.current
     val geofenceManager = remember { AppGeofenceManager(context) }
 
@@ -152,20 +157,11 @@ fun MainScreen(viewModel: TrackerViewModel) {
     val basePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        if (fineLocationGranted) {
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
             viewModel.updateLocation()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val hasBackground = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-
-                if (!hasBackground) {
-                    showBackgroundRationaleDialog = true
-                } else {
-                    geofenceManager.registerAllVenues()
-                }
+                val hasBackground = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+                if (!hasBackground) showBackgroundRationaleDialog = true else geofenceManager.registerAllVenues()
             } else {
                 geofenceManager.registerAllVenues()
             }
@@ -174,30 +170,19 @@ fun MainScreen(viewModel: TrackerViewModel) {
 
     LaunchedEffect(Unit) {
         val permissionsToRequest = mutableListOf<String>()
-
-        val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!hasFine) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
             permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val hasNotification = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            if (!hasNotification) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-
         if (permissionsToRequest.isNotEmpty()) {
             basePermissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             viewModel.updateLocation()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val hasBackground = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-                if (!hasBackground) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     showBackgroundRationaleDialog = true
                 } else {
                     geofenceManager.registerAllVenues()
@@ -216,34 +201,55 @@ fun MainScreen(viewModel: TrackerViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().padding(end = 8.dp)
                     ) {
-                        Icon(
-                            Icons.Rounded.DownhillSkiing,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "FTT Tracker",
+                            "⛷️ FTT Tracker",
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
+                        // Saison-Wechsler Dropdown
+                        var expandedSeason by remember { mutableStateOf(false) }
+                        Box {
+                            FilledTonalButton(
+                                onClick = { expandedSeason = true },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = Color.White.copy(alpha = 0.22f),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(14.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(selectedSeason, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            DropdownMenu(expanded = expandedSeason, onDismissRequest = { expandedSeason = false }) {
+                                availableSeasons.forEach { s ->
+                                    DropdownMenuItem(
+                                        text = { Text("Saison $s", fontWeight = if (s == selectedSeason) FontWeight.Bold else FontWeight.Normal) },
+                                        onClick = {
+                                            viewModel.selectSeason(s)
+                                            expandedSeason = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
                         FilledTonalButton(
                             onClick = { showTarifDialog = true },
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = Color.White.copy(alpha = 0.22f),
                                 contentColor = Color.White
                             ),
-                            shape = RoundedCornerShape(18.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
-                            Icon(Icons.Rounded.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Icon(Icons.Rounded.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tarif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, softWrap = false)
+                            Text("Tarif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 },
@@ -255,15 +261,16 @@ fun MainScreen(viewModel: TrackerViewModel) {
                 val items = listOf(
                     Triple(0, "Dashboard", Icons.Rounded.Dashboard),
                     Triple(1, "Kalender", Icons.Rounded.CalendarMonth),
-                    Triple(2, "Karte", Icons.Rounded.Map),
-                    Triple(3, "Partner", Icons.Rounded.Explore)
+                    Triple(2, "Statistik", Icons.Rounded.BarChart),
+                    Triple(3, "Karte", Icons.Rounded.Map),
+                    Triple(4, "Partner", Icons.Rounded.Explore)
                 )
                 items.forEach { (index, label, icon) ->
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         icon = { Icon(icon, contentDescription = label) },
-                        label = { Text(label, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal, softWrap = false) },
+                        label = { Text(label, fontSize = 11.sp, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal, softWrap = false) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GlacierBlue,
                             indicatorColor = GlacierBlue.copy(alpha = 0.12f)
@@ -286,12 +293,13 @@ fun MainScreen(viewModel: TrackerViewModel) {
                     onRequestEditVisit = { visitPendingEdit = it },
                     onRequestDeleteVisit = { visitPendingDeletion = it }
                 )
-                2 -> OsmMapOverviewView(focusVenue = targetMapVenue)
-                3 -> PartnerListView(
+                2 -> StatisticsView(viewModel = viewModel)
+                3 -> OsmMapOverviewView(viewModel = viewModel, focusVenue = targetMapVenue)
+                4 -> PartnerListView(
                     viewModel = viewModel,
                     onNavigateToMap = { venue ->
                         targetMapVenue = venue
-                        selectedTab = 2
+                        selectedTab = 3
                     },
                     onOpenDetail = { venue ->
                         selectedDetailVenue = venue
@@ -307,7 +315,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
                 onNavigateToMap = {
                     targetMapVenue = venue
                     selectedDetailVenue = null
-                    selectedTab = 2
+                    selectedTab = 3
                 },
                 onBookVisit = {
                     viewModel.recordVisit(venue, LocalDate.now(), "Über Partneransicht erfasst")
@@ -330,19 +338,10 @@ fun MainScreen(viewModel: TrackerViewModel) {
         if (showBackgroundRationaleDialog) {
             AlertDialog(
                 onDismissRequest = { showBackgroundRationaleDialog = false },
-                icon = {
-                    Icon(
-                        Icons.Rounded.LocationOn,
-                        contentDescription = null,
-                        tint = GlacierBlue,
-                        modifier = Modifier.size(36.dp)
-                    )
-                },
-                title = { Text("Automatische Erkennung im Hintergrund", fontWeight = FontWeight.Bold, color = AlpineDark) },
+                icon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(36.dp)) },
+                title = { Text("Automatische Erkennung mit Verweildauer", fontWeight = FontWeight.Bold, color = AlpineDark) },
                 text = {
-                    Text(
-                        "Damit dich die App beim Erreichen einer Liftstation oder eines Bades per Push-Nachricht an das Einbuchen erinnern kann, wähle im nächsten Schritt bitte 'Immer zulassen'.\n\nDie Erkennung erfolgt akkuschonend über Geofences."
-                    )
+                    Text("Damit dich die App nach 15 Minuten Verweildauer an einer Talstation an das Einbuchen erinnern kann, wähle bitte 'Immer zulassen'. Reine Durchfahrten auf der Autobahn lösen keinen Alarm aus.")
                 },
                 confirmButton = {
                     Button(
@@ -358,9 +357,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showBackgroundRationaleDialog = false }) {
-                        Text("Später", color = Color.Gray)
-                    }
+                    TextButton(onClick = { showBackgroundRationaleDialog = false }) { Text("Später", color = Color.Gray) }
                 }
             )
         }
@@ -370,13 +367,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
                 visit = visit,
                 onDismiss = { visitPendingEdit = null },
                 onSave = { updatedDate, updatedAmount, updatedNotes ->
-                    viewModel.updateVisit(
-                        visit.copy(
-                            date = updatedDate,
-                            savedAmount = updatedAmount,
-                            notes = updatedNotes
-                        )
-                    )
+                    viewModel.updateVisit(visit.copy(date = updatedDate, savedAmount = updatedAmount, notes = updatedNotes))
                     visitPendingEdit = null
                 }
             )
@@ -385,18 +376,9 @@ fun MainScreen(viewModel: TrackerViewModel) {
         visitPendingDeletion?.let { visit ->
             AlertDialog(
                 onDismissRequest = { visitPendingDeletion = null },
-                icon = {
-                    Icon(
-                        Icons.Rounded.DeleteForever,
-                        contentDescription = null,
-                        tint = CoralWarning,
-                        modifier = Modifier.size(36.dp)
-                    )
-                },
+                icon = { Icon(Icons.Rounded.DeleteForever, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(36.dp)) },
                 title = { Text("Eintrag löschen?", fontWeight = FontWeight.Bold, color = AlpineDark) },
-                text = {
-                    Text("Möchtest du '${visit.venueName}' vom ${visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))} (+${visit.savedAmount.formatEuro()}) wirklich entfernen?")
-                },
+                text = { Text("Möchtest du '${visit.venueName}' vom ${visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))} (+${visit.savedAmount.formatEuro()}) wirklich entfernen?") },
                 confirmButton = {
                     Button(
                         onClick = {
@@ -409,9 +391,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { visitPendingDeletion = null }) {
-                        Text("Abbrechen", color = AlpineNavy)
-                    }
+                    TextButton(onClick = { visitPendingDeletion = null }) { Text("Abbrechen", color = AlpineNavy) }
                 }
             )
         }
@@ -429,7 +409,7 @@ fun DashboardView(
     onRequestDeleteVisit: (VisitEntity) -> Unit
 ) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
-    val visits by viewModel.recentVisits.collectAsState(initial = emptyList())
+    val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
     var showAddVisitDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -447,10 +427,8 @@ fun DashboardView(
                     modifier = Modifier
                         .background(
                             Brush.linearGradient(
-                                colors = if (stats.isAmortized)
-                                    listOf(Color(0xFF0F3E2E), EmeraldGain)
-                                else
-                                    listOf(AlpineDark, AlpineNavy, GlacierBlue)
+                                colors = if (stats.isAmortized) listOf(Color(0xFF0F3E2E), EmeraldGain)
+                                else listOf(AlpineDark, AlpineNavy, GlacierBlue)
                             )
                         )
                         .padding(20.dp)
@@ -463,7 +441,7 @@ fun DashboardView(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = stats.tarifTitle.uppercase(Locale.GERMAN),
+                                    text = "SAISON ${stats.season} • ${stats.tarifTitle.uppercase(Locale.GERMAN)}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White.copy(alpha = 0.7f),
@@ -482,10 +460,7 @@ fun DashboardView(
                             Spacer(modifier = Modifier.width(8.dp))
                             IconButton(
                                 onClick = onOpenTarifDialog,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.15f))
-                                    .size(36.dp)
+                                modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).size(36.dp)
                             ) {
                                 Icon(Icons.Rounded.Edit, contentDescription = "Bearbeiten", tint = Color.White, modifier = Modifier.size(18.dp))
                             }
@@ -499,20 +474,8 @@ fun DashboardView(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "EINGEFAHRENER WERT",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White.copy(alpha = 0.75f),
-                                    letterSpacing = 1.sp
-                                )
-                                Text(
-                                    stats.totalValueSaved.formatEuro(),
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White,
-                                    softWrap = false
-                                )
+                                Text("EINGEFAHRENER WERT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.75f), letterSpacing = 1.sp)
+                                Text(stats.totalValueSaved.formatEuro(), fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White, softWrap = false)
                             }
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
@@ -523,8 +486,7 @@ fun DashboardView(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
-                                    fontSize = 14.sp,
-                                    softWrap = false
+                                    fontSize = 14.sp
                                 )
                             }
                         }
@@ -533,20 +495,14 @@ fun DashboardView(
 
                         LinearProgressIndicator(
                             progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp)),
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                             color = if (stats.isAmortized) EmeraldGain else FrostTeal,
                             trackColor = Color.White.copy(alpha = 0.25f)
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(
                                 if (stats.isAmortized) "🎉 Ticket amortisiert!" else "Noch offen zum Break-Even:",
                                 fontSize = 13.sp,
@@ -569,30 +525,16 @@ fun DashboardView(
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricTile(
-                    title = "Ausflüge",
-                    value = "${stats.totalVisits}",
-                    icon = Icons.Rounded.EventAvailable,
-                    tint = GlacierBlue,
-                    modifier = Modifier.weight(1f)
-                )
+                MetricTile("Ausflüge (${stats.season})", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
                 val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
-                MetricTile(
-                    title = "Ø Ersparnis/Tag",
-                    value = avg.formatEuro(),
-                    icon = Icons.Rounded.TrendingUp,
-                    tint = EmeraldGain,
-                    modifier = Modifier.weight(1f)
-                )
+                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
             }
         }
 
         item {
             Button(
                 onClick = { showAddVisitDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
@@ -604,15 +546,9 @@ fun DashboardView(
         }
 
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Letzte Aktivitäten", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
-                if (visits.isNotEmpty()) {
-                    Text("✏️ Ändern • 🗑️ Löschen", fontSize = 12.sp, color = Color.Gray)
-                }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Aktivitäten Saison ${stats.season}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                if (visits.isNotEmpty()) Text("✏️ Ändern • 🗑️ Löschen", fontSize = 12.sp, color = Color.Gray)
             }
         }
 
@@ -623,24 +559,16 @@ fun DashboardView(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(28.dp).fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(modifier = Modifier.padding(28.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Rounded.Hiking, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(48.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Noch keine Ausflüge erfasst", fontWeight = FontWeight.SemiBold, color = Color.Gray)
-                        Text("Tippe oben auf 'Besuch manuell eintragen'", fontSize = 12.sp, color = Color.LightGray)
+                        Text("Keine Ausflüge in Saison ${stats.season}", fontWeight = FontWeight.SemiBold, color = Color.Gray)
                     }
                 }
             }
         } else {
             items(visits) { visit ->
-                ModernVisitCard(
-                    visit = visit,
-                    onEdit = { onRequestEditVisit(visit) },
-                    onDelete = { onRequestDeleteVisit(visit) }
-                )
+                ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
             }
         }
     }
@@ -657,35 +585,217 @@ fun DashboardView(
     }
 }
 
+// ==========================================
+// 2. STATISTIKEN & FTT WRAPPED
+// ==========================================
 @Composable
-fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(tint.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+fun StatisticsView(viewModel: TrackerViewModel) {
+    val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
+    val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val categoryStats = remember(visits) {
+        val total = visits.sumOf { it.savedAmount }
+        VenueCategory.entries.mapNotNull { cat ->
+            val catVisits = visits.filter { it.category == cat.name }
+            if (catVisits.isEmpty()) null
+            else {
+                val sum = catVisits.sumOf { it.savedAmount }
+                val pct = if (total > 0) (sum / total).toFloat() else 0f
+                CategoryShareStat(cat, catVisits.size, sum, pct)
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AlpineDark, softWrap = false)
+        }.sortedByDescending { it.totalSaved }
+    }
+
+    val topVenues = remember(visits) {
+        visits.groupBy { it.venueName }
+            .map { (name, list) -> VenueTopStat(name, list.size, list.sumOf { it.savedAmount }) }
+            .sortedByDescending { it.count }
+            .take(3)
+    }
+
+    val costPerSkiDay = remember(stats.purchasePrice, visits) {
+        val skiVisits = visits.count { it.category == VenueCategory.SKI.name }
+        if (skiVisits > 0) stats.purchasePrice / skiVisits else 0.0
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // FTT Wrapped Header Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("FTT WRAPPED", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GlacierBlue, letterSpacing = 1.sp)
+                            Text("Saison-Rückblick ${stats.season}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                        }
+                        IconButton(
+                            onClick = {
+                                val shareText = "⛷️ Mein FTT Saison-Rückblick ${stats.season}:\n" +
+                                        "• ${stats.totalVisits} Ausflüge absolviert\n" +
+                                        "• ${stats.totalValueSaved.formatEuro()} Wert eingefahren\n" +
+                                        (if (stats.isAmortized) "• 🎉 Amortisiert mit +${stats.netSavings.formatEuro()} Reingewinn!\n" else "• ${stats.remainingToAmortize.formatEuro()} noch bis zum Break-Even\n") +
+                                        "Getrackt mit dem FTT Tracker für Android."
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Saison teilen"))
+                            },
+                            modifier = Modifier.clip(CircleShape).background(GlacierBlue.copy(alpha = 0.1f)).size(40.dp)
+                        ) {
+                            Icon(Icons.Rounded.Share, contentDescription = "Teilen", tint = GlacierBlue, modifier = Modifier.size(20.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Rechnerischer Preis pro Skitag:", fontSize = 13.sp, color = Color.Gray)
+                        Text(if (costPerSkiDay > 0) costPerSkiDay.formatEuro() else "–", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                    }
+                }
+            }
+        }
+
+        // Kategorie-Splitting
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text("Kategorie-Aufteilung", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AlpineDark)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (categoryStats.isEmpty()) {
+                        Text("Noch keine Daten für diese Saison.", fontSize = 13.sp, color = Color.Gray)
+                    } else {
+                        categoryStats.forEach { stat ->
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("${stat.category.iconLabel} (${stat.count}x)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text("${stat.totalSaved.formatEuro()} (${(stat.percentage * 100).toInt()}%)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = GlacierBlue)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                LinearProgressIndicator(
+                                    progress = { stat.percentage },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    color = when (stat.category) {
+                                        VenueCategory.SKI -> GlacierBlue
+                                        VenueCategory.SLED -> Color(0xFFE65100)
+                                        VenueCategory.ICE -> Color(0xFF7B1FA2)
+                                        VenueCategory.POOL -> Color(0xFF00838F)
+                                        VenueCategory.CULTURE -> Color(0xFFD84315)
+                                    },
+                                    trackColor = Color(0xFFE2E8F0)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Top 3 Gebiete
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text("Top Favoriten (${stats.season})", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AlpineDark)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (topVenues.isEmpty()) {
+                        Text("Noch keine Gebiete eingetragen.", fontSize = 13.sp, color = Color.Gray)
+                    } else {
+                        topVenues.forEachIndexed { idx, venue ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("${idx + 1}. ${venue.venueName}", fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                Text("${venue.count} Besuche (${venue.totalSaved.formatEuro()})", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EmeraldGain)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Auto-Backup & Export
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = CardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Datensicherung & Export", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                    Text("Automatische Sicherung ist aktiv. Du kannst deine Daten zusätzlich exportieren.", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val csvData = AutoBackupManager.exportCsv(visits)
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, csvData)
+                                        type = "text/csv"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "CSV exportieren"))
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("CSV Export", fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    AutoBackupManager.performAutoBackup(context, visits)
+                                    Toast.makeText(context, "✅ Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Backup jetzt", fontSize = 12.sp)
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 // ==========================================
-// 2. KALENDER
+// 3. KALENDER, KARTE & PARTNER
 // ==========================================
 @Composable
 fun CalendarView(
@@ -795,33 +905,24 @@ fun CalendarView(
         if (selectedVisits.isEmpty()) {
             Text("Kein Ausflug an diesem Tag eingetragen.", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(selectedVisits) { visit ->
-                    ModernVisitCard(
-                        visit = visit,
-                        onEdit = { onRequestEditVisit(visit) },
-                        onDelete = { onRequestDeleteVisit(visit) }
-                    )
+                    ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
                 }
             }
         }
     }
 }
 
-// ==========================================
-// 3. OPENSTREETMAP KARTENANSICHT (OPENTOPOMAP - KEIN API KEY BENÖTIGT)
-// ==========================================
 @Composable
-fun OsmMapOverviewView(focusVenue: Venue? = null) {
+fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
     val venues = VenueCatalog.venues
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
     val markerMap = remember { mutableMapOf<String, Marker>() }
+    val userLocation by viewModel.currentLocation.collectAsState(initial = null)
+    var userLocationMarker by remember { mutableStateOf<Marker?>(null) }
 
-    // OpenTopoMap mit topografischen Höhendetails für Tirol ohne Registrierung/API-Key
     val openTopoTileSource = remember {
         XYTileSource(
             "OpenTopoMap",
@@ -829,12 +930,8 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
             17,
             256,
             ".png",
-            arrayOf(
-                "https://a.tile.opentopomap.org/",
-                "https://b.tile.opentopomap.org/",
-                "https://c.tile.opentopomap.org/"
-            ),
-            "Kartendaten: © OpenStreetMap-Mitwirkende, SRTM | Kartendarstellung: © OpenTopoMap (CC-BY-SA)"
+            arrayOf("https://a.tile.opentopomap.org/", "https://b.tile.opentopomap.org/", "https://c.tile.opentopomap.org/"),
+            "Kartendaten: © OpenStreetMap-Mitwirkende, SRTM | Darstellung: © OpenTopoMap (CC-BY-SA)"
         )
     }
 
@@ -853,19 +950,40 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
         }
     }
 
-    AndroidView(
-        factory = {
-            mapView.apply {
-                tileProvider.clearTileCache()
-                setTileSource(openTopoTileSource)
-                setMultiTouchControls(true)
-                controller.setZoom(9.5)
-                controller.setCenter(GeoPoint(47.2692, 11.4041))
+    LaunchedEffect(userLocation) {
+        userLocation?.let { loc ->
+            val geoPoint = GeoPoint(loc.latitude, loc.longitude)
+            if (userLocationMarker == null) {
+                val marker = Marker(mapView).apply {
+                    position = geoPoint
+                    title = "Mein Standort"
+                    icon = createMyLocationMarkerDrawable(context)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                }
+                mapView.overlays.add(marker)
+                userLocationMarker = marker
+            } else {
+                userLocationMarker?.position = geoPoint
+            }
+            mapView.invalidate()
+        }
+    }
 
-                overlays.clear()
-                markerMap.clear()
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = {
+                mapView.apply {
+                    tileProvider.clearTileCache()
+                    setTileSource(openTopoTileSource)
+                    setMultiTouchControls(true)
+                    controller.setZoom(9.5)
+                    controller.setCenter(GeoPoint(47.2692, 11.4041))
 
-                venues.forEach { venue ->
+                    overlays.clear()
+                    markerMap.clear()
+                    userLocationMarker = null
+
+                    venues.forEach { venue ->
                         val marker = Marker(this)
                         marker.position = GeoPoint(venue.latitude, venue.longitude)
                         marker.title = venue.name
@@ -881,7 +999,6 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
                         marker.icon = createOsmMarkerDrawable(context, emoji, pinColor)
                         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
-                        // Eigenes InfoWindow mit LongPress-Listener zum direkten Einbuchen
                         marker.infoWindow = object : org.osmdroid.views.overlay.infowindow.BasicInfoWindow(
                             org.osmdroid.library.R.layout.bonuspack_bubble,
                             this
@@ -889,18 +1006,13 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
                             override fun onOpen(item: Any?) {
                                 super.onOpen(item)
                                 mView?.setOnLongClickListener { v ->
-                                    // Haptisches Feedback (Bestätigungsvibration)
                                     v.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
                                     viewModel.recordVisit(
                                         venue = venue,
                                         date = LocalDate.now(),
                                         notes = "Per Schnellbuchung (Karte) erfasst"
                                     )
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) direkt eingebucht!",
-                                        android.widget.Toast.LENGTH_LONG
-                                    ).show()
+                                    Toast.makeText(context, "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) direkt eingebucht!", Toast.LENGTH_SHORT).show()
                                     close()
                                     true
                                 }
@@ -910,16 +1022,44 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
                         overlays.add(marker)
                         markerMap[venue.id] = marker
                     }
-                invalidate()
-            }
-        },
-        modifier = Modifier.fillMaxSize()
-    )
+                    invalidate()
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        FloatingActionButton(
+            onClick = {
+                val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+                val isGpsEnabled = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                                   locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
+
+                if (!isGpsEnabled) {
+                    Toast.makeText(context, "Standortdienste sind deaktiviert. Bitte aktiviere GPS.", Toast.LENGTH_SHORT).show()
+                    try {
+                        context.startActivity(Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    } catch (_: Exception) {}
+                    return@FloatingActionButton
+                }
+
+                viewModel.updateLocation()
+                userLocation?.let { loc ->
+                    mapView.controller.animateTo(GeoPoint(loc.latitude, loc.longitude), 13.5, 900L)
+                } ?: run {
+                    Toast.makeText(context, "Suche GPS-Signal...", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 24.dp),
+            containerColor = Color.White,
+            contentColor = GlacierBlue,
+            shape = CircleShape,
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+        ) {
+            Icon(Icons.Rounded.MyLocation, contentDescription = "Mein Standort", modifier = Modifier.size(24.dp))
+        }
+    }
 }
 
-// ==========================================
-// 4. PARTNERLISTE
-// ==========================================
 @Composable
 fun PartnerListView(
     viewModel: TrackerViewModel,
@@ -955,9 +1095,7 @@ fun PartnerListView(
 
         Spacer(modifier = Modifier.height(10.dp))
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FilterChip(
@@ -978,15 +1116,10 @@ fun PartnerListView(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(filteredVenues) { venue ->
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenDetail(venue) },
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenDetail(venue) },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -997,34 +1130,17 @@ fun PartnerListView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) { CategoryBadge(category = venue.category, size = 40.dp, emojiSize = 20.sp, cornerRadius = 12.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CategoryBadge(category = venue.category)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    venue.name,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = AlpineDark,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             if (venue.subtitle.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    venue.subtitle,
-                                    fontSize = 11.sp,
-                                    color = Color.DarkGray,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Text(venue.subtitle, fontSize = 11.sp, color = Color.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Regulärer Tarif: ${venue.normalTicketPrice.formatEuro()}",
-                                fontSize = 12.sp,
-                                color = Color.Gray,
-                                softWrap = false
-                            )
+                            Text("Regulärer Tarif: ${venue.normalTicketPrice.formatEuro()}", fontSize = 12.sp, color = Color.Gray, softWrap = false)
                         }
                         userLocation?.let { loc ->
                             Spacer(modifier = Modifier.width(8.dp))
@@ -1034,24 +1150,10 @@ fun PartnerListView(
                                 color = GlacierBlue.copy(alpha = 0.12f),
                                 modifier = Modifier.clickable { onNavigateToMap(venue) }
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.LocationOn,
-                                        contentDescription = "Auf Karte zeigen",
-                                        tint = GlacierBlue,
-                                        modifier = Modifier.size(14.dp)
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                    Icon(Icons.Rounded.LocationOn, contentDescription = "Auf Karte zeigen", tint = GlacierBlue, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        "${"%.0f".format(dist)} km",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = GlacierBlue,
-                                        softWrap = false
-                                    )
+                                    Text("${"%.0f".format(dist)} km", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GlacierBlue, softWrap = false)
                                 }
                             }
                         }
@@ -1063,7 +1165,7 @@ fun PartnerListView(
 }
 
 // ==========================================
-// 5. DETAIL-MODAL-BOTTOM-SHEET
+// 4. DETAIL-MODAL-BOTTOM-SHEET
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1081,9 +1183,7 @@ fun VenueDetailBottomSheet(
         weatherData = try {
             withContext(Dispatchers.IO) {
                 val client = HttpClient(Android) {
-                    install(ContentNegotiation) {
-                        json(Json { ignoreUnknownKeys = true })
-                    }
+                    install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
                 }
                 val response: OpenMeteoResponse = client.get("https://api.open-meteo.com/v1/forecast") {
                     parameter("latitude", venue.latitude)
@@ -1093,7 +1193,7 @@ fun VenueDetailBottomSheet(
                 client.close()
                 response.current
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         } finally {
             isLoadingWeather = false
@@ -1106,20 +1206,13 @@ fun VenueDetailBottomSheet(
         containerColor = Color.White,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) { CategoryBadge(category = venue.category, size = 40.dp, emojiSize = 20.sp, cornerRadius = 12.dp)
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState())) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryBadge(category = venue.category, size = 40.dp, emojiSize = 20.sp, cornerRadius = 12.dp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AlpineDark)
-                    if (venue.subtitle.isNotEmpty()) {
-                        Text(venue.subtitle, fontSize = 13.sp, color = Color.Gray)
-                    }
+                    if (venue.subtitle.isNotEmpty()) Text(venue.subtitle, fontSize = 13.sp, color = Color.Gray)
                 }
             }
 
@@ -1127,10 +1220,7 @@ fun VenueDetailBottomSheet(
 
             Text("Betriebs- & Pisteninformation", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardSurface)
-            ) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardSurface)) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Status", color = Color.Gray, fontSize = 13.sp)
@@ -1158,21 +1248,14 @@ fun VenueDetailBottomSheet(
 
             Text("Live-Wetter vor Ort (Open-Meteo)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))
-            ) {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))) {
                 if (isLoadingWeather) {
                     Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = GlacierBlue, modifier = Modifier.size(28.dp))
                     }
                 } else if (weatherData != null) {
                     val w = weatherData!!
-                    Row(
-                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("${"%.1f".format(w.temperature_2m)} °C", fontSize = 24.sp, fontWeight = FontWeight.Black, color = AlpineDark)
                             Text("Gefühlt ${"%.1f".format(w.apparent_temperature)} °C", fontSize = 11.sp, color = Color.Gray)
@@ -1204,21 +1287,12 @@ fun VenueDetailBottomSheet(
             Spacer(modifier = Modifier.height(22.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onNavigateToMap,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) {
+                OutlinedButton(onClick = onNavigateToMap, shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1f).height(48.dp)) {
                     Icon(Icons.Rounded.Map, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Auf Karte", color = GlacierBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
-                Button(
-                    onClick = onBookVisit,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) {
+                Button(onClick = onBookVisit, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue), modifier = Modifier.weight(1f).height(48.dp)) {
                     Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Einbuchen", fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -1229,14 +1303,14 @@ fun VenueDetailBottomSheet(
 }
 
 // ==========================================
-// KARTEN & BADGES
+// 5. DIALOGE & KOMPONENTEN
 // ==========================================
 @Composable
 fun CategoryBadge(
     category: VenueCategory,
-    size: androidx.compose.ui.unit.Dp = 28.dp,
-    emojiSize: androidx.compose.ui.unit.TextUnit = 15.sp,
-    cornerRadius: androidx.compose.ui.unit.Dp = 8.dp
+    size: Dp = 28.dp,
+    emojiSize: TextUnit = 15.sp,
+    cornerRadius: Dp = 8.dp
 ) {
     val (emoji, bg) = when (category) {
         VenueCategory.SKI -> "⛷️" to Color(0xFFE0F2FE)
@@ -1245,46 +1319,27 @@ fun CategoryBadge(
         VenueCategory.POOL -> "🏊" to Color(0xFFE0F7FA)
         VenueCategory.CULTURE -> "🏛️" to Color(0xFFFBE9E7)
     }
-    Surface(
-        shape = RoundedCornerShape(cornerRadius),
-        color = bg,
-        modifier = Modifier.size(size)
-    ) {
+    Surface(shape = RoundedCornerShape(cornerRadius), color = bg, modifier = Modifier.size(size)) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Text(
-                text = emoji,
-                fontSize = emojiSize,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+            Text(text = emoji, fontSize = emojiSize, textAlign = TextAlign.Center)
         }
     }
 }
 
 @Composable
-fun ModernVisitCard(
-    visit: VisitEntity,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
+fun ModernVisitCard(visit: VisitEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onEdit() },
+        modifier = Modifier.fillMaxWidth().clickable { onEdit() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(EmeraldGain.copy(alpha = 0.12f)),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(EmeraldGain.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = EmeraldGain, modifier = Modifier.size(22.dp))
@@ -1293,85 +1348,54 @@ fun ModernVisitCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = visit.venueName,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = AlpineDark,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(visit.venueName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        softWrap = false
-                    )
+                    Text(visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), fontSize = 12.sp, color = Color.Gray, softWrap = false)
                     if (visit.notes.isNotEmpty()) {
-                        Text(
-                            text = " • ${visit.notes}",
-                            fontSize = 12.sp,
-                            color = GlacierBlue,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Text(" • ${visit.notes}", fontSize = 12.sp, color = GlacierBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = "+${visit.savedAmount.formatEuro()}",
-                    fontWeight = FontWeight.Black,
-                    color = EmeraldGain,
-                    fontSize = 15.sp,
-                    softWrap = false
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                Text("+${visit.savedAmount.formatEuro()}", fontWeight = FontWeight.Black, color = EmeraldGain, fontSize = 15.sp, softWrap = false)
                 Spacer(modifier = Modifier.width(6.dp))
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(GlacierBlue.copy(alpha = 0.10f))
-                ) {
-                    Icon(
-                        Icons.Rounded.EditCalendar,
-                        contentDescription = "Datum bearbeiten",
-                        tint = GlacierBlue,
-                        modifier = Modifier.size(17.dp)
-                    )
+                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp).clip(CircleShape).background(GlacierBlue.copy(alpha = 0.10f))) {
+                    Icon(Icons.Rounded.EditCalendar, contentDescription = "Bearbeiten", tint = GlacierBlue, modifier = Modifier.size(17.dp))
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(CoralWarning.copy(alpha = 0.10f))
-                ) {
-                    Icon(
-                        Icons.Rounded.DeleteOutline,
-                        contentDescription = "Eintrag löschen",
-                        tint = CoralWarning,
-                        modifier = Modifier.size(17.dp)
-                    )
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp).clip(CircleShape).background(CoralWarning.copy(alpha = 0.10f))) {
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "Löschen", tint = CoralWarning, modifier = Modifier.size(17.dp))
                 }
             }
         }
     }
 }
 
-// ==========================================
-// DIALOGE
-// ==========================================
+@Composable
+fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AlpineDark, softWrap = false)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualVisitDialog(
@@ -1407,9 +1431,7 @@ fun ManualVisitDialog(
                         selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
                     }
                     showDatePicker = false
-                }) {
-                    Text("Übernehmen")
-                }
+                }) { Text("Übernehmen") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
@@ -1423,31 +1445,17 @@ fun ManualVisitDialog(
         onDismissRequest = onDismiss,
         title = { Text("Besuch manuell eintragen", fontWeight = FontWeight.Bold, color = AlpineDark) },
         text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-            ) {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Datum des Ausflugs", fontSize = 11.sp, color = Color.Gray)
-                            Text(
-                                selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AlpineDark
-                            )
+                            Text(selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                         }
                         Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
@@ -1466,29 +1474,14 @@ fun ManualVisitDialog(
                 Spacer(modifier = Modifier.height(6.dp))
                 displayedVenues.forEach { v ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { selectedVenue = v }
-                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { selectedVenue = v }.padding(vertical = 4.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedVenue.id == v.id, onClick = { selectedVenue = v })
                         Spacer(modifier = Modifier.width(6.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = v.name,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}",
-                                fontSize = 11.sp,
-                                color = Color.Gray,
-                                softWrap = false
-                            )
+                            Text(v.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}", fontSize = 11.sp, color = Color.Gray, softWrap = false)
                         }
                     }
                 }
@@ -1515,9 +1508,7 @@ fun ManualVisitDialog(
                         fontSize = 11.sp,
                         color = GlacierBlue,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .clickable { priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice) }
-                            .padding(top = 4.dp)
+                        modifier = Modifier.clickable { priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice) }.padding(top = 4.dp)
                     )
                 }
 
@@ -1577,9 +1568,7 @@ fun EditVisitDialog(
                         editedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
                     }
                     showDatePicker = false
-                }) {
-                    Text("Übernehmen")
-                }
+                }) { Text("Übernehmen") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
@@ -1600,25 +1589,15 @@ fun EditVisitDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(22.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Besuchsdatum", fontSize = 11.sp, color = Color.Gray)
-                            Text(
-                                editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AlpineDark
-                            )
+                            Text(editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                         }
                         Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
@@ -1635,7 +1614,6 @@ fun EditVisitDialog(
                         }
                     },
                     label = { Text("Angerechneter Tarif (€)") },
-                    placeholder = { Text("z. B. 48.00") },
                     trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -1647,9 +1625,7 @@ fun EditVisitDialog(
                         "Katalog-Standardtarif: ${defaultVenuePrice.formatEuro()}",
                         fontSize = 11.sp,
                         color = Color.Gray,
-                        modifier = Modifier
-                            .clickable { editedPriceText = String.format(Locale.US, "%.2f", defaultVenuePrice) }
-                            .padding(vertical = 2.dp)
+                        modifier = Modifier.clickable { editedPriceText = String.format(Locale.US, "%.2f", defaultVenuePrice) }.padding(vertical = 2.dp)
                     )
                 }
 
@@ -1701,13 +1677,7 @@ fun TarifSelectionDialog(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isEarlyBird = !isEarlyBird }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().clickable { isEarlyBird = !isEarlyBird }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = isEarlyBird, onCheckedChange = { isEarlyBird = it })
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -1722,39 +1692,20 @@ fun TarifSelectionDialog(
                 for (category in TarifCategory.entries) {
                     val price = if (isEarlyBird) category.earlyBirdPrice else category.normalPrice
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { selectedCategory = category }
-                            .padding(vertical = 6.dp, horizontal = 4.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { selectedCategory = category }.padding(vertical = 6.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedCategory == category, onClick = { selectedCategory = category })
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = category.label,
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Text(category.label, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = price.formatEuro(),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = AlpineDark,
-                            softWrap = false
-                        )
+                        Text(price.formatEuro(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineDark, softWrap = false)
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onSave(TicketConfig(category = selectedCategory, isEarlyBird = isEarlyBird)) },
-                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
-            ) {
+            Button(onClick = { onSave(TicketConfig(category = selectedCategory, isEarlyBird = isEarlyBird)) }, colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)) {
                 Text("Speichern")
             }
         },
@@ -1768,9 +1719,7 @@ fun calculateDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     val r = 6371.0
     val dLat = Math.toRadians(lat2 - lat1)
     val dLon = Math.toRadians(lon2 - lon1)
-    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
     val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     return r * c
 }
@@ -1780,27 +1729,32 @@ fun createOsmMarkerDrawable(context: Context, emoji: String, backgroundColor: In
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    // Äußerer Schatten / Rand
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-        style = Paint.Style.FILL
-    }
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; style = Paint.Style.FILL }
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 2f, borderPaint)
 
-    // Farbiger Hintergrund-Pin
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = backgroundColor
-        style = Paint.Style.FILL
-    }
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = backgroundColor; style = Paint.Style.FILL }
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 7f, bgPaint)
 
-    // Master-Emoji zentriert zeichnen
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 42f
-        textAlign = Paint.Align.CENTER
-    }
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 42f; textAlign = Paint.Align.CENTER }
     val yPos = (canvas.height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f)
     canvas.drawText(emoji, canvas.width / 2f, yPos, textPaint)
+
+    return BitmapDrawable(context.resources, bitmap)
+}
+
+fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
+    val sizePx = 64
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val auraPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.parseColor("#330077B6"); style = Paint.Style.FILL }
+    canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 2f, auraPaint)
+
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; style = Paint.Style.FILL }
+    canvas.drawCircle(sizePx / 2f, sizePx / 2f, 16f, borderPaint)
+
+    val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.parseColor("#0077B6"); style = Paint.Style.FILL }
+    canvas.drawCircle(sizePx / 2f, sizePx / 2f, 11f, centerPaint)
 
     return BitmapDrawable(context.resources, bitmap)
 }

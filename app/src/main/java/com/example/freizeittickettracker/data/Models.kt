@@ -2,9 +2,20 @@ package com.example.freizeittickettracker.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 import java.time.LocalDate
 
 fun Double.formatEuro(): String = "%.2f €".format(this)
+
+fun determineSeason(date: LocalDate): String {
+    // Tiroler Freizeitticket-Saison läuft üblicherweise von 1. Oktober bis 30. September
+    val year = date.year
+    return if (date.monthValue >= 10) {
+        "$year/${(year + 1).toString().takeLast(2)}"
+    } else {
+        "${year - 1}/${year.toString().takeLast(2)}"
+    }
+}
 
 enum class VenueCategory(val displayName: String, val iconLabel: String) {
     SKI("Skigebiet / Bergbahn", "⛷️ Ski"),
@@ -55,7 +66,7 @@ data class TicketConfigEntity(
     fun toModel(): TicketConfig {
         val cat = try {
             TarifCategory.valueOf(categoryName)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             TarifCategory.U23
         }
         return TicketConfig(category = cat, isEarlyBird = isEarlyBird)
@@ -63,18 +74,22 @@ data class TicketConfigEntity(
 }
 
 @Entity(tableName = "visits")
+@Serializable
 data class VisitEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val venueId: String,
     val venueName: String,
     val category: String,
+    @Serializable(with = LocalDateSerializer::class)
     val date: LocalDate,
     val savedAmount: Double,
-    val notes: String = ""
+    val notes: String = "",
+    val season: String = determineSeason(date)
 )
 
 data class DashboardStats(
+    val season: String = determineSeason(LocalDate.now()),
     val tarifTitle: String = "U23 (Vorverkauf)",
     val purchasePrice: Double = 710.0,
     val totalValueSaved: Double = 0.0,
@@ -82,5 +97,19 @@ data class DashboardStats(
     val netSavings: Double = 0.0,
     val amortizationProgress: Float = 0f,
     val isAmortized: Boolean = false,
-    val totalVisits: Int = 0
+    val totalVisits: Int = 0,
+    val availableSeasons: List<String> = listOf(determineSeason(LocalDate.now()))
+)
+
+data class CategoryShareStat(
+    val category: VenueCategory,
+    val count: Int,
+    val totalSaved: Double,
+    val percentage: Float
+)
+
+data class VenueTopStat(
+    val venueName: String,
+    val count: Int,
+    val totalSaved: Double
 )
