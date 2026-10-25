@@ -100,6 +100,7 @@ data class CurrentWeather(
 
 class MainActivity : ComponentActivity() {
     private val viewModel: TrackerViewModel by viewModels()
+    private val venueToOpenFromIntent = mutableStateOf<Venue?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -107,11 +108,13 @@ class MainActivity : ComponentActivity() {
         val osmConfig = Configuration.getInstance()
         osmConfig.load(this, PreferenceManager.getDefaultSharedPreferences(this))
         osmConfig.userAgentValue = "FTTTracker/1.2 (Android; contact: info@ftt-tracker.local)"
-        
+
         val osmCacheDir = File(cacheDir, "osm_topo_tiles")
         if (!osmCacheDir.exists()) osmCacheDir.mkdirs()
         osmConfig.osmdroidBasePath = osmCacheDir
         osmConfig.osmdroidTileCache = osmCacheDir
+
+        extractVenueFromIntent(intent)
 
         setContent {
             MaterialTheme(
@@ -123,8 +126,27 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreen(viewModel)
+                    MainScreen(
+                        viewModel = viewModel,
+                        initialDetailVenue = venueToOpenFromIntent.value,
+                        onClearInitialVenue = { venueToOpenFromIntent.value = null }
+                    )
                 }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        extractVenueFromIntent(intent)
+    }
+
+    private fun extractVenueFromIntent(intent: Intent?) {
+        val venueId = intent?.getStringExtra("EXTRA_OPEN_VENUE_ID")
+        if (!venueId.isNullOrBlank()) {
+            VenueCatalog.findById(venueId)?.let { venue ->
+                venueToOpenFromIntent.value = venue
             }
         }
     }
@@ -132,10 +154,21 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: TrackerViewModel) {
+fun MainScreen(
+    viewModel: TrackerViewModel,
+    initialDetailVenue: Venue? = null,
+    onClearInitialVenue: () -> Unit = {}
+) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var targetMapVenue by remember { mutableStateOf<Venue?>(null) }
     var selectedDetailVenue by remember { mutableStateOf<Venue?>(null) }
+
+    LaunchedEffect(initialDetailVenue) {
+        if (initialDetailVenue != null) {
+            selectedDetailVenue = initialDetailVenue
+            onClearInitialVenue()
+        }
+    }
 
     var showTarifDialog by remember { mutableStateOf(false) }
     var visitPendingDeletion by remember { mutableStateOf<VisitEntity?>(null) }
@@ -145,6 +178,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
     val ticketConfig by viewModel.ticketConfig.collectAsState(initial = TicketConfig())
     val selectedSeason by viewModel.selectedSeason.collectAsState()
     val availableSeasons by viewModel.availableSeasons.collectAsState(initial = listOf(selectedSeason))
+    val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val geofenceManager = remember { AppGeofenceManager(context) }
 
@@ -308,7 +342,6 @@ fun MainScreen(viewModel: TrackerViewModel) {
         }
 
         selectedDetailVenue?.let { venue ->
-            val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
             VenueDetailBottomSheet(
                 venue = venue,
                 existingVisits = allVisits,
@@ -328,7 +361,6 @@ fun MainScreen(viewModel: TrackerViewModel) {
                     selectedDetailVenue = null
                 }
             )
-        }
         }
 
         if (showTarifDialog) {
@@ -417,6 +449,7 @@ fun DashboardView(
 ) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
+    val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
     var showAddVisitDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -577,6 +610,7 @@ fun DashboardView(
             items(visits) { visit ->
                 ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
             }
+        }
 
         item {
             val currentContext = LocalContext.current
@@ -587,7 +621,7 @@ fun DashboardView(
                     "1.2"
                 }
             }
-            
+
             Text(
                 text = "FTT Tracker v$vName",
                 fontSize = 11.sp,
@@ -598,13 +632,12 @@ fun DashboardView(
                 textAlign = TextAlign.Center
             )
         }
-        }
     }
 
-        if (showAddVisitDialog) {
+    if (showAddVisitDialog) {
         ManualVisitDialog(
             venues = VenueCatalog.venues,
-            existingVisits = visits,
+            existingVisits = allVisits,
             onDismiss = { showAddVisitDialog = false },
             onConfirm = { venue, date, amount, notes ->
                 viewModel.recordVisit(venue, date, notes, amount)
@@ -983,7 +1016,7 @@ fun OsmMapOverviewView(
         }
     }
 
-        LaunchedEffect(userLocation) {
+    LaunchedEffect(userLocation) {
         userLocation?.let { loc ->
             val geoPoint = GeoPoint(loc.latitude, loc.longitude)
             if (userLocationMarker == null) {
@@ -1002,7 +1035,6 @@ fun OsmMapOverviewView(
         }
     }
 
-    // Marker dynamisch bei neuen Buchungen aktualisieren
     LaunchedEffect(visitedVenueIdsToday) {
         venues.forEach { v ->
             markerMap[v.id]?.let { m ->
@@ -1046,7 +1078,8 @@ fun OsmMapOverviewView(
                             override fun onLongPress(event: android.view.MotionEvent?, mapView: MapView?): Boolean {
                                 val touched = hitTest(event, mapView)
                                 if (touched) {
-                                    if (visitedVenueIdsToday.contains(venue.id)) {
+                                    val isAlreadyDone = allVisits.any { it.venueId == venue.id && it.date == LocalDate.now() }
+                                    if (isAlreadyDone) {
                                         Toast.makeText(
                                             context,
                                             "⚠️ ${venue.name} wurde heute bereits verbucht!",
@@ -1101,7 +1134,8 @@ fun OsmMapOverviewView(
                                 mView?.isLongClickable = true
 
                                 val triggerBooking = {
-                                    if (visitedVenueIdsToday.contains(venue.id)) {
+                                    val isAlreadyDone = allVisits.any { it.venueId == venue.id && it.date == LocalDate.now() }
+                                    if (isAlreadyDone) {
                                         Toast.makeText(
                                             context,
                                             "⚠️ ${venue.name} wurde heute bereits verbucht!",
@@ -1295,10 +1329,11 @@ fun VenueDetailBottomSheet(
     onBookVisit: (LocalDate, Double, String) -> Unit
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
-        var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var priceText by remember(venue) { mutableStateOf(String.format(Locale.US, "%.2f", venue.normalTicketPrice)) }
     var visitNotes by remember { mutableStateOf("") }
     var showDuplicateWarning by remember { mutableStateOf(false) }
+
     var weatherData by remember { mutableStateOf<CurrentWeather?>(null) }
     var isLoadingWeather by remember { mutableStateOf(true) }
 
@@ -1408,9 +1443,8 @@ fun VenueDetailBottomSheet(
                 }
             }
 
-                        Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // Datumswahl für das Einbuchen
             Text("Besuchsdatum wählen", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1492,7 +1526,6 @@ fun VenueDetailBottomSheet(
                 singleLine = true
             )
 
-            // Warnung bei existierendem Besuch am gewählten Datum
             val isAlreadyBookedOnDate = existingVisits.any { it.venueId == venue.id && it.date == selectedDate }
             if (isAlreadyBookedOnDate) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1535,8 +1568,8 @@ fun VenueDetailBottomSheet(
                             showDuplicateWarning = true
                         } else {
                             val finalPrice = priceText.toDoubleOrNull() ?: venue.normalTicketPrice
-val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Über Partneransicht erfasst"
-onBookVisit(selectedDate, finalPrice, finalNote)
+                            val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Über Partneransicht erfasst"
+                            onBookVisit(selectedDate, finalPrice, finalNote)
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
@@ -1579,7 +1612,6 @@ onBookVisit(selectedDate, finalPrice, finalNote)
             ) {
                 DatePicker(state = datePickerState)
             }
-        }
         }
     }
 }
@@ -1686,13 +1718,13 @@ fun ManualVisitDialog(
     onDismiss: () -> Unit,
     onConfirm: (Venue, LocalDate, Double, String) -> Unit
 ) {
-    var showDuplicateWarning by remember { mutableStateOf(false) }
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var priceText by remember { mutableStateOf(String.format(Locale.US, "%.2f", venues.first().normalTicketPrice)) }
     var notes by remember { mutableStateOf("") }
     var filterText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showDuplicateWarning by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedVenue) {
         priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice)
@@ -1713,6 +1745,7 @@ fun ManualVisitDialog(
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                        showDuplicateWarning = false
                     }
                     showDatePicker = false
                 }) { Text("Übernehmen") }
@@ -1772,7 +1805,8 @@ fun ManualVisitDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                if (existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate }) {
+                val isAlreadyBooked = existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate }
+                if (isAlreadyBooked) {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         colors = CardDefaults.cardColors(containerColor = CoralWarning.copy(alpha = 0.12f)),
@@ -1826,7 +1860,7 @@ fun ManualVisitDialog(
                 )
             }
         },
-                confirmButton = {
+        confirmButton = {
             Button(
                 onClick = {
                     val alreadyBooked = existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate }
@@ -1837,9 +1871,11 @@ fun ManualVisitDialog(
                         onConfirm(selectedVenue, selectedDate, finalAmount, notes)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate } && showDuplicateWarning) CoralWarning else GlacierBlue
+                )
             ) {
-                Text("Jetzt einbuchen")
+                Text(if (existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate } && showDuplicateWarning) "Trotzdem buchen" else "Jetzt einbuchen")
             }
         },
         dismissButton = {
