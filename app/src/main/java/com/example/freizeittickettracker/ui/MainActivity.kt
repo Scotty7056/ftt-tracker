@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,7 +76,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // OSMDroid Konfiguration sauber mit App-spezifischem Cache und User-Agent laden
         val osmConfig = Configuration.getInstance()
         osmConfig.load(this, PreferenceManager.getDefaultSharedPreferences(this))
         osmConfig.userAgentValue = "${packageName}/1.1 (Android; https://github.com/Scotty7056/freizeitticket-tracker)"
@@ -755,7 +755,7 @@ fun CalendarView(
 }
 
 // ==========================================
-// 3. OPENSTREETMAP KARTENANSICHT (MIT FREIEM CARTO/OSM-SERVER)
+// 3. OPENSTREETMAP KARTENANSICHT
 // ==========================================
 @Composable
 fun OsmMapOverviewView() {
@@ -763,7 +763,6 @@ fun OsmMapOverviewView() {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
 
-    // CARTO Voyager Kachel-Quelle (schnell, zuverlässig und ohne Tile-Usage-403)
     val cartoTileSource = remember {
         XYTileSource(
             "CartoVoyager",
@@ -791,7 +790,6 @@ fun OsmMapOverviewView() {
     AndroidView(
         factory = {
             mapView.apply {
-                // Kacheln leeren, falls alte Fehler-Kacheln im RAM liegen
                 tileProvider.clearTileCache()
                 setTileSource(cartoTileSource)
                 setMultiTouchControls(true)
@@ -952,26 +950,30 @@ fun PartnerListView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// KARTEN & BADGES
+// KARTEN & BADGES (ICON-BADGE STATT TEXT)
 // ==========================================
 @Composable
 fun CategoryBadge(category: VenueCategory) {
-    val (label, bg, fg) = when (category) {
-        VenueCategory.SKI -> Triple("Ski", Color(0xFFE0F2FE), GlacierBlue)
-        VenueCategory.SLED -> Triple("Rodeln", Color(0xFFFFE0B2), Color(0xFFE65100))
-        VenueCategory.ICE -> Triple("Eis", Color(0xFFEDE7F6), Color(0xFF7B1FA2))
-        VenueCategory.POOL -> Triple("Bad", Color(0xFFE0F7FA), Color(0xFF00838F))
-        VenueCategory.CULTURE -> Triple("Kultur", Color(0xFFFBE9E7), Color(0xFFD84315))
+    val (iconRes, bg, fg) = when (category) {
+        VenueCategory.SKI -> Triple(R.drawable.ic_ski, Color(0xFFE0F2FE), GlacierBlue)
+        VenueCategory.SLED -> Triple(R.drawable.ic_sled, Color(0xFFFFE0B2), Color(0xFFE65100))
+        VenueCategory.ICE -> Triple(R.drawable.ic_ice, Color(0xFFEDE7F6), Color(0xFF7B1FA2))
+        VenueCategory.POOL -> Triple(R.drawable.ic_pool, Color(0xFFE0F7FA), Color(0xFF00838F))
+        VenueCategory.CULTURE -> Triple(R.drawable.ic_culture, Color(0xFFFBE9E7), Color(0xFFD84315))
     }
-    Surface(shape = RoundedCornerShape(6.dp), color = bg) {
-        Text(
-            label,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = fg,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            softWrap = false
-        )
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = bg,
+        modifier = Modifier.size(26.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = category.displayName,
+                tint = fg,
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 
