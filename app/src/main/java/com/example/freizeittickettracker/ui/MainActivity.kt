@@ -571,7 +571,7 @@ fun DashboardView(
             }
 
         item {
-                        val currentContext = LocalContext.current
+            val currentContext = LocalContext.current
             val vName = remember(currentContext) {
                 try {
                     currentContext.packageManager.getPackageInfo(currentContext.packageName, 0)?.versionName ?: "1.2"
@@ -579,7 +579,6 @@ fun DashboardView(
                     "1.2"
                 }
             }
-            val vName = pInfo?.versionName ?: "1.2"
             
             Text(
                 text = "FTT Tracker v$vName",
