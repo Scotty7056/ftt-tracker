@@ -103,9 +103,9 @@ class MainActivity : ComponentActivity() {
 
         val osmConfig = Configuration.getInstance()
         osmConfig.load(this, PreferenceManager.getDefaultSharedPreferences(this))
-        osmConfig.userAgentValue = "${packageName}/1.1 (Android; https://github.com/Scotty7056/freizeitticket-tracker)"
+        osmConfig.userAgentValue = "FTTTracker/1.1 (Android; contact: info@ftt-tracker.local)"
         
-        val osmCacheDir = File(cacheDir, "osm_tiles")
+        val osmCacheDir = File(cacheDir, "osm_topo_tiles")
         if (!osmCacheDir.exists()) osmCacheDir.mkdirs()
         osmConfig.osmdroidBasePath = osmCacheDir
         osmConfig.osmdroidTileCache = osmCacheDir
@@ -291,7 +291,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
                     viewModel = viewModel,
                     onNavigateToMap = { venue ->
                         targetMapVenue = venue
-                        selectedTab = 2 // Tab Karte
+                        selectedTab = 2
                     },
                     onOpenDetail = { venue ->
                         selectedDetailVenue = venue
@@ -300,7 +300,6 @@ fun MainScreen(viewModel: TrackerViewModel) {
             }
         }
 
-        // Details-Sheet mit Öffnungszeiten, Pistenbericht & Live-Wetter
         selectedDetailVenue?.let { venue ->
             VenueDetailBottomSheet(
                 venue = venue,
@@ -807,7 +806,7 @@ fun CalendarView(
 }
 
 // ==========================================
-// 3. OPENSTREETMAP KARTENANSICHT
+// 3. OPENSTREETMAP KARTENANSICHT (OPENTOPOMAP - KEIN API KEY BENÖTIGT)
 // ==========================================
 @Composable
 fun OsmMapOverviewView(focusVenue: Venue? = null) {
@@ -816,19 +815,20 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
     val mapView = remember { MapView(context) }
     val markerMap = remember { mutableMapOf<String, Marker>() }
 
-    val cartoTileSource = remember {
+    // OpenTopoMap mit topografischen Höhendetails für Tirol ohne Registrierung/API-Key
+    val openTopoTileSource = remember {
         XYTileSource(
-            "CartoVoyager",
-            0,
-            19,
+            "OpenTopoMap",
+            1,
+            17,
             256,
             ".png",
             arrayOf(
-                "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
-                "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
-                "https://c.basemaps.cartocdn.com/rastertiles/voyager/"
+                "https://a.tile.opentopomap.org/",
+                "https://b.tile.opentopomap.org/",
+                "https://c.tile.opentopomap.org/"
             ),
-            "© OpenStreetMap contributors © CARTO"
+            "Kartendaten: © OpenStreetMap-Mitwirkende, SRTM | Kartendarstellung: © OpenTopoMap (CC-BY-SA)"
         )
     }
 
@@ -851,7 +851,7 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
         factory = {
             mapView.apply {
                 tileProvider.clearTileCache()
-                setTileSource(cartoTileSource)
+                setTileSource(openTopoTileSource)
                 setMultiTouchControls(true)
                 controller.setZoom(9.5)
                 controller.setCenter(GeoPoint(47.2692, 11.4041))
@@ -885,7 +885,7 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
 }
 
 // ==========================================
-// 4. PARTNERLISTE (MIT KLICK-AKTIONEN)
+// 4. PARTNERLISTE
 // ==========================================
 @Composable
 fun PartnerListView(
@@ -1031,7 +1031,7 @@ fun PartnerListView(
 }
 
 // ==========================================
-// 5. DETAIL-MODAL-BOTTOM-SHEET (INFO, PISTE & WETTER)
+// 5. DETAIL-MODAL-BOTTOM-SHEET
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1094,7 +1094,6 @@ fun VenueDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // 1. Betriebs- und Pistenbericht
             Text("Betriebs- & Pisteninformation", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
             Spacer(modifier = Modifier.height(8.dp))
             Card(
@@ -1126,7 +1125,6 @@ fun VenueDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // 2. Wettervorhersage vor Ort
             Text("Live-Wetter vor Ort (Open-Meteo)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
             Spacer(modifier = Modifier.height(8.dp))
             Card(
@@ -1174,7 +1172,6 @@ fun VenueDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(22.dp))
 
-            // Aktions-Buttons
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = onNavigateToMap,
@@ -1653,8 +1650,6 @@ fun TarifSelectionDialog(
         }
     )
 }
-
-fun Double.formatEuro(): String = "%.2f €".format(this)
 
 fun calculateDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371.0
