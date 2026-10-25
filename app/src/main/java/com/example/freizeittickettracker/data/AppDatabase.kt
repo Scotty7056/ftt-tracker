@@ -2,38 +2,18 @@ package com.example.freizeittickettracker.data
 
 import android.content.Context
 import androidx.room.*
-import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
-@Dao
-interface VisitDao {
-    @Query("SELECT * FROM visits ORDER BY date DESC, id DESC")
-    fun getAllVisits(): Flow<List<VisitEntity>>
+class Converters {
+    @TypeConverter
+    fun fromTimestamp(value: String?): LocalDate? = value?.let { LocalDate.parse(it) }
 
-    @Query("SELECT * FROM visits ORDER BY date DESC, id DESC LIMIT 5")
-    fun getRecentVisits(): Flow<List<VisitEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertVisit(visit: VisitEntity): Long
-
-    @Delete
-    suspend fun deleteVisit(visit: VisitEntity)
+    @TypeConverter
+    fun dateToTimestamp(date: LocalDate?): String? = date?.toString()
 }
 
-@Dao
-interface ConfigDao {
-    @Query("SELECT * FROM ticket_config WHERE id = 1 LIMIT 1")
-    fun getConfig(): Flow<TicketConfigEntity?>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveConfig(config: TicketConfigEntity)
-}
-
-@Database(
-    entities = [VisitEntity::class, TicketConfigEntity::class],
-    version = 1,
-    exportSchema = false
-)
-@TypeConverters(DateConverters::class)
+@Database(entities = [VisitEntity::class, TicketConfigEntity::class], version = 1, exportSchema = false)
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun visitDao(): VisitDao
     abstract fun configDao(): ConfigDao
@@ -47,10 +27,8 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "freizeitticket_database"
-                )
-                .fallbackToDestructiveMigration()
-                .build()
+                    "freizeitticket_db"
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }
