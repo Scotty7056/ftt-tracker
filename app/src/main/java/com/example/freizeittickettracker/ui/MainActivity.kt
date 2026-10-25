@@ -369,8 +369,14 @@ fun MainScreen(viewModel: TrackerViewModel) {
             EditVisitDialog(
                 visit = visit,
                 onDismiss = { visitPendingEdit = null },
-                onSave = { updatedDate, updatedNotes ->
-                    viewModel.updateVisit(visit.copy(date = updatedDate, notes = updatedNotes))
+                onSave = { updatedDate, updatedAmount, updatedNotes ->
+                    viewModel.updateVisit(
+                        visit.copy(
+                            date = updatedDate,
+                            savedAmount = updatedAmount,
+                            notes = updatedNotes
+                        )
+                    )
                     visitPendingEdit = null
                 }
             )
@@ -643,8 +649,8 @@ fun DashboardView(
         ManualVisitDialog(
             venues = VenueCatalog.venues,
             onDismiss = { showAddVisitDialog = false },
-            onConfirm = { venue, date, notes ->
-                viewModel.recordVisit(venue, date, notes)
+            onConfirm = { venue, date, amount, notes ->
+                viewModel.recordVisit(venue, date, notes, amount)
                 showAddVisitDialog = false
             }
         )
@@ -860,23 +866,50 @@ fun OsmMapOverviewView(focusVenue: Venue? = null) {
                 markerMap.clear()
 
                 venues.forEach { venue ->
-                    val marker = Marker(this)
-                    marker.position = GeoPoint(venue.latitude, venue.longitude)
-                    marker.title = venue.name
-                    marker.snippet = "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}"
+                        val marker = Marker(this)
+                        marker.position = GeoPoint(venue.latitude, venue.longitude)
+                        marker.title = venue.name
+                        marker.snippet = "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n(Lange drücken zum Einbuchen)"
 
-                    val (pinColor, iconRes) = when (venue.category) {
-                        VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to R.drawable.ic_ski
-                        VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to R.drawable.ic_sled
-                        VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to R.drawable.ic_ice
-                        VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to R.drawable.ic_pool
-                        VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to R.drawable.ic_culture
+                        val (pinColor, emoji) = when (venue.category) {
+                            VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
+                            VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "🛷"
+                            VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to "⛸️"
+                            VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "🏊"
+                            VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "🏛️"
+                        }
+                        marker.icon = createOsmMarkerDrawable(context, emoji, pinColor)
+                        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+
+                        // Eigenes InfoWindow mit LongPress-Listener zum direkten Einbuchen
+                        marker.infoWindow = object : org.osmdroid.views.overlay.infowindow.BasicInfoWindow(
+                            org.osmdroid.library.R.layout.bonuspack_bubble,
+                            this
+                        ) {
+                            override fun onOpen(item: Any?) {
+                                super.onOpen(item)
+                                mView?.setOnLongClickListener { v ->
+                                    // Haptisches Feedback (Bestätigungsvibration)
+                                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                    viewModel.recordVisit(
+                                        venue = venue,
+                                        date = LocalDate.now(),
+                                        notes = "Per Schnellbuchung (Karte) erfasst"
+                                    )
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) direkt eingebucht!",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                    close()
+                                    true
+                                }
+                            }
+                        }
+
+                        overlays.add(marker)
+                        markerMap[venue.id] = marker
                     }
-                    marker.icon = createOsmMarkerDrawable(context, iconRes, pinColor)
-                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    overlays.add(marker)
-                    markerMap[venue.id] = marker
-                }
                 invalidate()
             }
         },
@@ -1344,17 +1377,22 @@ fun ModernVisitCard(
 fun ManualVisitDialog(
     venues: List<Venue>,
     onDismiss: () -> Unit,
-    onConfirm: (Venue, LocalDate, String) -> Unit
+    onConfirm: (Venue, LocalDate, Double, String) -> Unit
 ) {
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var priceText by remember { mutableStateOf(String.format(Locale.US, "%.2f", venues.first().normalTicketPrice)) }
     var notes by remember { mutableStateOf("") }
     var filterText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
 
+    LaunchedEffect(selectedVenue) {
+        priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice)
+    }
+
     val displayedVenues = remember(filterText) {
-        if (filterText.isEmpty()) venues.take(6)
-        else venues.filter { it.name.contains(filterText, ignoreCase = true) || it.subtitle.contains(filterText, ignoreCase = true) }.take(6)
+        if (filterText.isEmpty()) venues.take(5)
+        else venues.filter { it.name.contains(filterText, ignoreCase = true) || it.subtitle.contains(filterText, ignoreCase = true) }.take(5)
     }
 
     if (showDatePicker) {
@@ -1385,7 +1423,11 @@ fun ManualVisitDialog(
         onDismissRequest = onDismiss,
         title = { Text("Besuch manuell eintragen", fontWeight = FontWeight.Bold, color = AlpineDark) },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 OutlinedCard(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1402,7 +1444,7 @@ fun ManualVisitDialog(
                             Text("Datum des Ausflugs", fontSize = 11.sp, color = Color.Gray)
                             Text(
                                 selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)),
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = AlpineDark
                             )
@@ -1411,7 +1453,7 @@ fun ManualVisitDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = filterText,
@@ -1421,14 +1463,14 @@ fun ManualVisitDialog(
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 displayedVenues.forEach { v ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { selectedVenue = v }
-                            .padding(vertical = 5.dp, horizontal = 4.dp),
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedVenue.id == v.id, onClick = { selectedVenue = v })
@@ -1451,11 +1493,40 @@ fun ManualVisitDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { input ->
+                        val sanitized = input.replace(',', '.')
+                        if (sanitized.isEmpty() || sanitized.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                            priceText = sanitized
+                        }
+                    },
+                    label = { Text("Gültiger Tarif (€)") },
+                    trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                if (selectedVenue.normalTicketPrice != (priceText.toDoubleOrNull() ?: 0.0)) {
+                    Text(
+                        "Zurücksetzen auf Standard (${selectedVenue.normalTicketPrice.formatEuro()})",
+                        fontSize = 11.sp,
+                        color = GlacierBlue,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clickable { priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice) }
+                            .padding(top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    placeholder = { Text("Optionale Notiz (z. B. 'Neuschnee, Kaiserwetter')", fontSize = 12.sp) },
+                    placeholder = { Text("Optionale Notiz (z. B. 'Halbtageskarte', 'Kaiserwetter')", fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1463,7 +1534,10 @@ fun ManualVisitDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(selectedVenue, selectedDate, notes) },
+                onClick = {
+                    val finalAmount = priceText.toDoubleOrNull() ?: selectedVenue.normalTicketPrice
+                    onConfirm(selectedVenue, selectedDate, finalAmount, notes)
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
             ) {
                 Text("Jetzt einbuchen")
@@ -1480,11 +1554,16 @@ fun ManualVisitDialog(
 fun EditVisitDialog(
     visit: VisitEntity,
     onDismiss: () -> Unit,
-    onSave: (LocalDate, String) -> Unit
+    onSave: (LocalDate, Double, String) -> Unit
 ) {
     var editedDate by remember { mutableStateOf(visit.date) }
     var editedNotes by remember { mutableStateOf(visit.notes) }
+    var editedPriceText by remember { mutableStateOf(String.format(Locale.US, "%.2f", visit.savedAmount)) }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    val defaultVenuePrice = remember(visit.venueId) {
+        VenueCatalog.findById(visit.venueId)?.normalTicketPrice
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
@@ -1514,7 +1593,7 @@ fun EditVisitDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text("Eintrag bearbeiten", fontWeight = FontWeight.Bold, color = AlpineDark)
+                Text("Eintrag & Tarif anpassen", fontWeight = FontWeight.Bold, color = AlpineDark)
                 Text(visit.venueName, fontSize = 13.sp, color = GlacierBlue, fontWeight = FontWeight.SemiBold)
             }
         },
@@ -1533,7 +1612,7 @@ fun EditVisitDialog(
                         Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(22.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Datum anpassen", fontSize = 11.sp, color = Color.Gray)
+                            Text("Besuchsdatum", fontSize = 11.sp, color = Color.Gray)
                             Text(
                                 editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)),
                                 fontSize = 14.sp,
@@ -1548,10 +1627,39 @@ fun EditVisitDialog(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedTextField(
+                    value = editedPriceText,
+                    onValueChange = { input ->
+                        val sanitized = input.replace(',', '.')
+                        if (sanitized.isEmpty() || sanitized.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                            editedPriceText = sanitized
+                        }
+                    },
+                    label = { Text("Angerechneter Tarif (€)") },
+                    placeholder = { Text("z. B. 48.00") },
+                    trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                if (defaultVenuePrice != null && defaultVenuePrice != (editedPriceText.toDoubleOrNull() ?: 0.0)) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Katalog-Standardtarif: ${defaultVenuePrice.formatEuro()}",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        modifier = Modifier
+                            .clickable { editedPriceText = String.format(Locale.US, "%.2f", defaultVenuePrice) }
+                            .padding(vertical = 2.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
                     value = editedNotes,
                     onValueChange = { editedNotes = it },
-                    label = { Text("Notiz") },
-                    placeholder = { Text("z. B. Skitour, Nachmittags...") },
+                    label = { Text("Notiz / Grund für Preisabweichung") },
+                    placeholder = { Text("z. B. Halbtageskarte, Vormittagstarif...") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1559,7 +1667,10 @@ fun EditVisitDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(editedDate, editedNotes) },
+                onClick = {
+                    val finalAmount = editedPriceText.toDoubleOrNull() ?: visit.savedAmount
+                    onSave(editedDate, finalAmount, editedNotes)
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
             ) {
                 Text("Speichern")
@@ -1664,32 +1775,32 @@ fun calculateDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     return r * c
 }
 
-fun createOsmMarkerDrawable(context: Context, vectorResId: Int, backgroundColor: Int): BitmapDrawable {
-    val sizePx = 80
+fun createOsmMarkerDrawable(context: Context, emoji: String, backgroundColor: Int): BitmapDrawable {
+    val sizePx = 92
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Äußerer Schatten / Rand
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 2f, borderPaint)
+
+    // Farbiger Hintergrund-Pin
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = backgroundColor
         style = Paint.Style.FILL
     }
-    val radius = sizePx / 2f
-    canvas.drawCircle(radius, radius, radius - 3f, paint)
+    canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 7f, bgPaint)
 
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
+    // Master-Emoji zentriert zeichnen
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 42f
+        textAlign = Paint.Align.CENTER
     }
-    canvas.drawCircle(radius, radius, radius - 3f, strokePaint)
-
-    val drawable = ContextCompat.getDrawable(context, vectorResId)
-    drawable?.let {
-        it.setTint(android.graphics.Color.WHITE)
-        val pad = 18
-        it.setBounds(pad, pad, sizePx - pad, sizePx - pad)
-        it.draw(canvas)
-    }
+    val yPos = (canvas.height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f)
+    canvas.drawText(emoji, canvas.width / 2f, yPos, textPaint)
 
     return BitmapDrawable(context.resources, bitmap)
 }
