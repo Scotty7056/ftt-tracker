@@ -26,13 +26,10 @@ android {
 
         signingConfigs {
         create("release") {
-            val keystoreFile = file("keystore.jks")
-            if (keystoreFile.exists()) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "meinpasswort123"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "fttkey"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "meinpasswort123"
-            }
+            storeFile = file("keystore.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "meinpasswort123"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "fttkey"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "meinpasswort123"
         }
     }
 
@@ -43,11 +40,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val keystoreFile = file("keystore.jks")
-            if (keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
+    }
         release {
             isMinifyEnabled = false
             proguardFiles(
