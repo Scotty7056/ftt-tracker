@@ -308,19 +308,27 @@ fun MainScreen(viewModel: TrackerViewModel) {
         }
 
         selectedDetailVenue?.let { venue ->
+            val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
             VenueDetailBottomSheet(
                 venue = venue,
+                existingVisits = allVisits,
                 onDismiss = { selectedDetailVenue = null },
                 onNavigateToMap = {
                     targetMapVenue = venue
                     selectedDetailVenue = null
                     selectedTab = 3
                 },
-                onBookVisit = {
-                    viewModel.recordVisit(venue, LocalDate.now(), "Über Partneransicht erfasst")
+                onBookVisit = { chosenDate, customPrice, note ->
+                    viewModel.recordVisit(venue, chosenDate, note, customPrice)
+                    Toast.makeText(
+                        context,
+                        "✅ ${venue.name} (${chosenDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}) eingebucht!",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     selectedDetailVenue = null
                 }
             )
+        }
         }
 
         if (showTarifDialog) {
@@ -1281,10 +1289,16 @@ fun PartnerListView(
 @Composable
 fun VenueDetailBottomSheet(
     venue: Venue,
+    existingVisits: List<VisitEntity> = emptyList(),
     onDismiss: () -> Unit,
     onNavigateToMap: () -> Unit,
-    onBookVisit: () -> Unit
+    onBookVisit: (LocalDate, Double, String) -> Unit
 ) {
+    var showDatePicker by remember { mutableStateOf(false) }
+        var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var priceText by remember(venue) { mutableStateOf(String.format(Locale.US, "%.2f", venue.normalTicketPrice)) }
+    var visitNotes by remember { mutableStateOf("") }
+    var showDuplicateWarning by remember { mutableStateOf(false) }
     var weatherData by remember { mutableStateOf<CurrentWeather?>(null) }
     var isLoadingWeather by remember { mutableStateOf(true) }
 
@@ -1394,20 +1408,178 @@ fun VenueDetailBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
+                        Spacer(modifier = Modifier.height(18.dp))
+
+            // Datumswahl für das Einbuchen
+            Text("Besuchsdatum wählen", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDatePicker = true },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.outlinedCardColors(containerColor = CardSurface)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(GlacierBlue.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (selectedDate == LocalDate.now()) "Heute" else selectedDate.format(DateTimeFormatter.ofPattern("EEEE", Locale.GERMAN)),
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN)),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AlpineDark
+                        )
+                    }
+                    TextButton(onClick = { showDatePicker = true }) {
+                        Text("Datum ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = priceText,
+                onValueChange = { input ->
+                    val sanitized = input.replace(',', '.')
+                    if (sanitized.isEmpty() || sanitized.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                        priceText = sanitized
+                    }
+                },
+                label = { Text("Angerechneter Tarif (€)") },
+                trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            if (venue.normalTicketPrice != (priceText.toDoubleOrNull() ?: 0.0)) {
+                Text(
+                    text = "Zurücksetzen auf Normaltarif (${venue.normalTicketPrice.formatEuro()})",
+                    fontSize = 11.sp,
+                    color = GlacierBlue,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clickable { priceText = String.format(Locale.US, "%.2f", venue.normalTicketPrice) }
+                        .padding(top = 4.dp, start = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = visitNotes,
+                onValueChange = { visitNotes = it },
+                placeholder = { Text("Optionale Notiz (z. B. 'Halbtageskarte ab 12h')", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            // Warnung bei existierendem Besuch am gewählten Datum
+            val isAlreadyBookedOnDate = existingVisits.any { it.venueId == venue.id && it.date == selectedDate }
+            if (isAlreadyBookedOnDate) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = CoralWarning.copy(alpha = 0.12f)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Warning, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Bereits am ${selectedDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))} eingebucht!",
+                            color = CoralWarning,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onNavigateToMap, shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1f).height(48.dp)) {
+                OutlinedButton(
+                    onClick = onNavigateToMap,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
                     Icon(Icons.Rounded.Map, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Auf Karte", color = GlacierBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
-                Button(onClick = onBookVisit, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue), modifier = Modifier.weight(1f).height(48.dp)) {
+
+                Button(
+                    onClick = {
+                        if (isAlreadyBookedOnDate && !showDuplicateWarning) {
+                            showDuplicateWarning = true
+                        } else {
+                            val finalPrice = priceText.toDoubleOrNull() ?: venue.normalTicketPrice
+val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Über Partneransicht erfasst"
+onBookVisit(selectedDate, finalPrice, finalNote)
+                        }
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isAlreadyBookedOnDate && showDuplicateWarning) CoralWarning else GlacierBlue
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
                     Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Einbuchen", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(
+                        text = if (isAlreadyBookedOnDate && showDuplicateWarning) "Trotzdem buchen" else "Einbuchen",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
             }
+        }
+
+        if (showDatePicker) {
+            val datePickerState = rememberDatePickerState(
+                initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+            )
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                            showDuplicateWarning = false
+                        }
+                        showDatePicker = false
+                    }) { Text("Übernehmen") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
         }
     }
 }
