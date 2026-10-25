@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_background">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Freizeitticket Tirol"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="#90E0EF" />
+
+    <TextView
+        android:id="@+id/widget_saved_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0,00 €"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="2dp" />
+
+    <ProgressBar
+        android:id="@+id/widget_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="8dp"
+        android:max="100"
+        android:progress="0"
+        android:progressTint="#00B4D8" />
+
+    <TextView
+        android:id="@+id/widget_progress_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0% amortisiert"
+        android:textSize="11sp"
+        android:textColor="#E0E0E0"
+        android:layout_marginTop="4dp" />
+</LinearLayout>
