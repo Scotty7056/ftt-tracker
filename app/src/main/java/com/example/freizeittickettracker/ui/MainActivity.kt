@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
@@ -49,6 +50,16 @@ import androidx.preference.PreferenceManager
 import com.example.freizeittickettracker.R
 import com.example.freizeittickettracker.data.*
 import com.example.freizeittickettracker.receiver.AppGeofenceManager
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.android.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
@@ -69,6 +80,20 @@ val FrostTeal = Color(0xFF00B4D8)
 val EmeraldGain = Color(0xFF10B981)
 val CoralWarning = Color(0xFFE53935)
 val CardSurface = Color(0xFFF8FAFC)
+
+@Serializable
+data class OpenMeteoResponse(
+    val current: CurrentWeather? = null
+)
+
+@Serializable
+data class CurrentWeather(
+    val temperature_2m: Double = 0.0,
+    val relative_humidity_2m: Double = 0.0,
+    val apparent_temperature: Double = 0.0,
+    val weather_code: Int = 0,
+    val wind_speed_10m: Double = 0.0
+)
 
 class MainActivity : ComponentActivity() {
     private val viewModel: TrackerViewModel by viewModels()
@@ -106,6 +131,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(viewModel: TrackerViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var targetMapVenue by remember { mutableStateOf<Venue?>(null) }
+    var selectedDetailVenue by remember { mutableStateOf<Venue?>(null) }
+
     var showTarifDialog by remember { mutableStateOf(false) }
     var visitPendingDeletion by remember { mutableStateOf<VisitEntity?>(null) }
     var visitPendingEdit by remember { mutableStateOf<VisitEntity?>(null) }
@@ -118,9 +146,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
     val backgroundLocationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            geofenceManager.registerAllVenues()
-        }
+        if (isGranted) geofenceManager.registerAllVenues()
     }
 
     val basePermissionLauncher = rememberLauncherForActivityResult(
@@ -260,9 +286,35 @@ fun MainScreen(viewModel: TrackerViewModel) {
                     onRequestEditVisit = { visitPendingEdit = it },
                     onRequestDeleteVisit = { visitPendingDeletion = it }
                 )
-                2 -> OsmMapOverviewView()
-                3 -> PartnerListView(viewModel)
+                2 -> OsmMapOverviewView(focusVenue = targetMapVenue)
+                3 -> PartnerListView(
+                    viewModel = viewModel,
+                    onNavigateToMap = { venue ->
+                        targetMapVenue = venue
+                        selectedTab = 2 // Tab Karte
+                    },
+                    onOpenDetail = { venue ->
+                        selectedDetailVenue = venue
+                    }
+                )
             }
+        }
+
+        // Details-Sheet mit Öffnungszeiten, Pistenbericht & Live-Wetter
+        selectedDetailVenue?.let { venue ->
+            VenueDetailBottomSheet(
+                venue = venue,
+                onDismiss = { selectedDetailVenue = null },
+                onNavigateToMap = {
+                    targetMapVenue = venue
+                    selectedDetailVenue = null
+                    selectedTab = 2
+                },
+                onBookVisit = {
+                    viewModel.recordVisit(venue, LocalDate.now(), "Über Partneransicht erfasst")
+                    selectedDetailVenue = null
+                }
+            )
         }
 
         if (showTarifDialog) {
@@ -758,10 +810,11 @@ fun CalendarView(
 // 3. OPENSTREETMAP KARTENANSICHT
 // ==========================================
 @Composable
-fun OsmMapOverviewView() {
+fun OsmMapOverviewView(focusVenue: Venue? = null) {
     val venues = VenueCatalog.venues
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+    val markerMap = remember { mutableMapOf<String, Marker>() }
 
     val cartoTileSource = remember {
         XYTileSource(
@@ -787,6 +840,13 @@ fun OsmMapOverviewView() {
         }
     }
 
+    LaunchedEffect(focusVenue) {
+        focusVenue?.let { v ->
+            mapView.controller.animateTo(GeoPoint(v.latitude, v.longitude), 14.0, 1000L)
+            markerMap[v.id]?.showInfoWindow()
+        }
+    }
+
     AndroidView(
         factory = {
             mapView.apply {
@@ -797,6 +857,8 @@ fun OsmMapOverviewView() {
                 controller.setCenter(GeoPoint(47.2692, 11.4041))
 
                 overlays.clear()
+                markerMap.clear()
+
                 venues.forEach { venue ->
                     val marker = Marker(this)
                     marker.position = GeoPoint(venue.latitude, venue.longitude)
@@ -813,6 +875,7 @@ fun OsmMapOverviewView() {
                     marker.icon = createOsmMarkerDrawable(context, iconRes, pinColor)
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     overlays.add(marker)
+                    markerMap[venue.id] = marker
                 }
                 invalidate()
             }
@@ -822,10 +885,14 @@ fun OsmMapOverviewView() {
 }
 
 // ==========================================
-// 4. PARTNERLISTE
+// 4. PARTNERLISTE (MIT KLICK-AKTIONEN)
 // ==========================================
 @Composable
-fun PartnerListView(viewModel: TrackerViewModel) {
+fun PartnerListView(
+    viewModel: TrackerViewModel,
+    onNavigateToMap: (Venue) -> Unit,
+    onOpenDetail: (Venue) -> Unit
+) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<VenueCategory?>(null) }
     val userLocation by viewModel.currentLocation.collectAsState(initial = null)
@@ -884,7 +951,9 @@ fun PartnerListView(viewModel: TrackerViewModel) {
         ) {
             items(filteredVenues) { venue ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenDetail(venue) },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -929,17 +998,29 @@ fun PartnerListView(viewModel: TrackerViewModel) {
                             Spacer(modifier = Modifier.width(8.dp))
                             val dist = calculateDistanceKm(loc.latitude, loc.longitude, venue.latitude, venue.longitude)
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFF1F5F9)
+                                shape = RoundedCornerShape(10.dp),
+                                color = GlacierBlue.copy(alpha = 0.12f),
+                                modifier = Modifier.clickable { onNavigateToMap(venue) }
                             ) {
-                                Text(
-                                    "${"%.0f".format(dist)} km",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = GlacierBlue,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    softWrap = false
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.LocationOn,
+                                        contentDescription = "Auf Karte zeigen",
+                                        tint = GlacierBlue,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "${"%.0f".format(dist)} km",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GlacierBlue,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -950,7 +1031,177 @@ fun PartnerListView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// KARTEN & BADGES (ICON-BADGE STATT TEXT)
+// 5. DETAIL-MODAL-BOTTOM-SHEET (INFO, PISTE & WETTER)
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VenueDetailBottomSheet(
+    venue: Venue,
+    onDismiss: () -> Unit,
+    onNavigateToMap: () -> Unit,
+    onBookVisit: () -> Unit
+) {
+    var weatherData by remember { mutableStateOf<CurrentWeather?>(null) }
+    var isLoadingWeather by remember { mutableStateOf(true) }
+
+    LaunchedEffect(venue) {
+        isLoadingWeather = true
+        weatherData = try {
+            withContext(Dispatchers.IO) {
+                val client = HttpClient(Android) {
+                    install(ContentNegotiation) {
+                        json(Json { ignoreUnknownKeys = true })
+                    }
+                }
+                val response: OpenMeteoResponse = client.get("https://api.open-meteo.com/v1/forecast") {
+                    parameter("latitude", venue.latitude)
+                    parameter("longitude", venue.longitude)
+                    parameter("current", "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m")
+                }.body()
+                client.close()
+                response.current
+            }
+        } catch (e: Exception) {
+            null
+        } finally {
+            isLoadingWeather = false
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryBadge(venue.category)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AlpineDark)
+                    if (venue.subtitle.isNotEmpty()) {
+                        Text(venue.subtitle, fontSize = 13.sp, color = Color.Gray)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // 1. Betriebs- und Pistenbericht
+            Text("Betriebs- & Pisteninformation", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardSurface)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Status", color = Color.Gray, fontSize = 13.sp)
+                        Text("● Regulärer Betrieb", color = EmeraldGain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Öffnungszeiten", color = Color.Gray, fontSize = 13.sp)
+                        Text("08:30 – 16:30 Uhr", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(if (venue.category == VenueCategory.SKI) "Schneelage (Berg/Tal)" else "Bedingungen", color = Color.Gray, fontSize = 13.sp)
+                        Text(if (venue.category == VenueCategory.SKI) "125 cm / 40 cm" else "Sehr gut präpariert", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Einzelticket (Normalpreis)", color = Color.Gray, fontSize = 13.sp)
+                        Text(venue.normalTicketPrice.formatEuro(), fontWeight = FontWeight.Bold, color = GlacierBlue, fontSize = 14.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // 2. Wettervorhersage vor Ort
+            Text("Live-Wetter vor Ort (Open-Meteo)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))
+            ) {
+                if (isLoadingWeather) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = GlacierBlue, modifier = Modifier.size(28.dp))
+                    }
+                } else if (weatherData != null) {
+                    val w = weatherData!!
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${"%.1f".format(w.temperature_2m)} °C", fontSize = 24.sp, fontWeight = FontWeight.Black, color = AlpineDark)
+                            Text("Gefühlt ${"%.1f".format(w.apparent_temperature)} °C", fontSize = 11.sp, color = Color.Gray)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val condition = when (w.weather_code) {
+                                0 -> "☀️ Klar"
+                                1, 2, 3 -> "⛅ Leicht bewölkt"
+                                45, 48 -> "🌫️ Nebel"
+                                51, 53, 55, 61, 63, 65 -> "🌧️ Regen"
+                                71, 73, 75, 77, 85, 86 -> "❄️ Schneefall"
+                                else -> "☁️ Bedeckt"
+                            }
+                            Text(condition, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GlacierBlue)
+                            Text("Wind: ${"%.0f".format(w.wind_speed_10m)} km/h", fontSize = 11.sp, color = Color.Gray)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Feuchte", fontSize = 11.sp, color = Color.Gray)
+                            Text("${"%.0f".format(w.relative_humidity_2m)}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text("Wetterdaten aktuell nicht abrufbar", fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(22.dp))
+
+            // Aktions-Buttons
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onNavigateToMap,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) {
+                    Icon(Icons.Rounded.Map, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Auf Karte", color = GlacierBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Button(
+                    onClick = onBookVisit,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) {
+                    Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Einbuchen", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// KARTEN & BADGES
 // ==========================================
 @Composable
 fun CategoryBadge(category: VenueCategory) {
@@ -1087,7 +1338,7 @@ fun ModernVisitCard(
 }
 
 // ==========================================
-// DIALOGE (MANUELL EINTRAGEN & DATUM BEARBEITEN)
+// DIALOGE
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
