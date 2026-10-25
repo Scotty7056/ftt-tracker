@@ -20,7 +20,7 @@ class FreizeitticketWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val db = AppDatabase.getDatabase(context)
         val visitDao = db.visitDao()
-        val configDao = db.configDao()
+        val configDao = db.ticketConfigDao()
 
         CoroutineScope(Dispatchers.IO).launch {
             val visits = visitDao.getAllVisits().firstOrNull() ?: emptyList()
