@@ -1202,24 +1202,23 @@ fun VenueDetailBottomSheet(
 // ==========================================
 @Composable
 fun CategoryBadge(category: VenueCategory) {
-    val (iconRes, bg, fg) = when (category) {
-        VenueCategory.SKI -> Triple(R.drawable.ic_ski, Color(0xFFE0F2FE), GlacierBlue)
-        VenueCategory.SLED -> Triple(R.drawable.ic_sled, Color(0xFFFFE0B2), Color(0xFFE65100))
-        VenueCategory.ICE -> Triple(R.drawable.ic_ice, Color(0xFFEDE7F6), Color(0xFF7B1FA2))
-        VenueCategory.POOL -> Triple(R.drawable.ic_pool, Color(0xFFE0F7FA), Color(0xFF00838F))
-        VenueCategory.CULTURE -> Triple(R.drawable.ic_culture, Color(0xFFFBE9E7), Color(0xFFD84315))
+    val (emoji, bg) = when (category) {
+        VenueCategory.SKI -> "⛷️" to Color(0xFFE0F2FE)
+        VenueCategory.SLED -> "🛷" to Color(0xFFFFE0B2)
+        VenueCategory.ICE -> "⛸️" to Color(0xFFEDE7F6)
+        VenueCategory.POOL -> "🏊" to Color(0xFFE0F7FA)
+        VenueCategory.CULTURE -> "🏛️" to Color(0xFFFBE9E7)
     }
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = bg,
-        modifier = Modifier.size(26.dp)
+        modifier = Modifier.size(28.dp)
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Icon(
-                painter = painterResource(id = iconRes),
-                contentDescription = category.displayName,
-                tint = fg,
-                modifier = Modifier.size(16.dp)
+            Text(
+                text = emoji,
+                fontSize = 15.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
