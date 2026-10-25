@@ -1,13 +1,16 @@
-name: Build Android APK
+name: Build FTT Tracker APK
 
 on:
-  workflow_dispatch:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -19,14 +22,19 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
 
     - name: Build Debug APK
-      run: gradle assembleDebug -Pandroid.useAndroidX=true -Pandroid.nonTransitiveRClass=true --stacktrace
+      run: ./gradlew assembleDebug --stacktrace
 
-    - name: Upload APK Artifact
+    - name: Rename APK to FTT-Tracker.apk
+      run: |
+        cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/FTT-Tracker.apk
+
+    - name: Upload FTT-Tracker Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: FreizeitticketTracker-APK
-        path: app/build/outputs/apk/debug/*.apk
+        name: FTT-Tracker-APK
+        path: app/build/outputs/apk/debug/FTT-Tracker.apk
+        retention-days: 14
