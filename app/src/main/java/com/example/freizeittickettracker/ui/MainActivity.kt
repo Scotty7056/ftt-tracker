@@ -571,9 +571,14 @@ fun DashboardView(
             }
 
         item {
-            val pInfo = try {
-                LocalContext.current.packageManager.getPackageInfo(LocalContext.current.packageName, 0)
-            } catch (_: Exception) { null }
+                        val currentContext = LocalContext.current
+            val vName = remember(currentContext) {
+                try {
+                    currentContext.packageManager.getPackageInfo(currentContext.packageName, 0)?.versionName ?: "1.2"
+                } catch (_: Exception) {
+                    "1.2"
+                }
+            }
             val vName = pInfo?.versionName ?: "1.2"
             
             Text(
@@ -589,9 +594,10 @@ fun DashboardView(
         }
     }
 
-    if (showAddVisitDialog) {
+        if (showAddVisitDialog) {
         ManualVisitDialog(
             venues = VenueCatalog.venues,
+            existingVisits = visits,
             onDismiss = { showAddVisitDialog = false },
             onConfirm = { venue, date, amount, notes ->
                 viewModel.recordVisit(venue, date, notes, amount)
@@ -970,7 +976,7 @@ fun OsmMapOverviewView(
         }
     }
 
-    LaunchedEffect(userLocation) {
+        LaunchedEffect(userLocation) {
         userLocation?.let { loc ->
             val geoPoint = GeoPoint(loc.latitude, loc.longitude)
             if (userLocationMarker == null) {
@@ -987,6 +993,29 @@ fun OsmMapOverviewView(
             }
             mapView.invalidate()
         }
+    }
+
+    // Marker dynamisch bei neuen Buchungen aktualisieren
+    LaunchedEffect(visitedVenueIdsToday) {
+        venues.forEach { v ->
+            markerMap[v.id]?.let { m ->
+                val isVisited = visitedVenueIdsToday.contains(v.id)
+                val (pinColor, emoji) = when (v.category) {
+                    VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
+                    VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "🛷"
+                    VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to "⛸️"
+                    VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "🏊"
+                    VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "🏛️"
+                }
+                m.icon = createOsmMarkerDrawable(context, emoji, pinColor, isVisited)
+                m.snippet = if (isVisited) {
+                    "${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}\n✅ Heute bereits erfasst"
+                } else {
+                    "${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
+                }
+            }
+        }
+        mapView.invalidate()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1482,9 +1511,11 @@ fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.
 @Composable
 fun ManualVisitDialog(
     venues: List<Venue>,
+    existingVisits: List<VisitEntity> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (Venue, LocalDate, Double, String) -> Unit
 ) {
+    var showDuplicateWarning by remember { mutableStateOf(false) }
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var priceText by remember { mutableStateOf(String.format(Locale.US, "%.2f", venues.first().normalTicketPrice)) }
@@ -1570,6 +1601,25 @@ fun ManualVisitDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                if (existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        colors = CardDefaults.cardColors(containerColor = CoralWarning.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Warning, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Hinweis: Dieses Ziel wurde am gewählten Tag bereits gebucht!",
+                                color = CoralWarning,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { input ->
@@ -1605,11 +1655,16 @@ fun ManualVisitDialog(
                 )
             }
         },
-        confirmButton = {
+                confirmButton = {
             Button(
                 onClick = {
-                    val finalAmount = priceText.toDoubleOrNull() ?: selectedVenue.normalTicketPrice
-                    onConfirm(selectedVenue, selectedDate, finalAmount, notes)
+                    val alreadyBooked = existingVisits.any { it.venueId == selectedVenue.id && it.date == selectedDate }
+                    if (alreadyBooked && !showDuplicateWarning) {
+                        showDuplicateWarning = true
+                    } else {
+                        val finalAmount = priceText.toDoubleOrNull() ?: selectedVenue.normalTicketPrice
+                        onConfirm(selectedVenue, selectedDate, finalAmount, notes)
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
             ) {
