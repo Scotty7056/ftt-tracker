@@ -964,8 +964,7 @@ fun PartnerListView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CategoryBadge(venue.category)
+                            Row(verticalAlignment = Alignment.CenterVertically) { CategoryBadge(category = venue.category, size = 40.dp, emojiSize = 20.sp, cornerRadius = 12.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     venue.name,
@@ -1081,8 +1080,7 @@ fun VenueDetailBottomSheet(
                 .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CategoryBadge(venue.category)
+            Row(verticalAlignment = Alignment.CenterVertically) { CategoryBadge(category = venue.category, size = 40.dp, emojiSize = 20.sp, cornerRadius = 12.dp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AlpineDark)
@@ -1201,7 +1199,12 @@ fun VenueDetailBottomSheet(
 // KARTEN & BADGES
 // ==========================================
 @Composable
-fun CategoryBadge(category: VenueCategory) {
+fun CategoryBadge(
+    category: VenueCategory,
+    size: androidx.compose.ui.unit.Dp = 28.dp,
+    emojiSize: androidx.compose.ui.unit.TextUnit = 15.sp,
+    cornerRadius: androidx.compose.ui.unit.Dp = 8.dp
+) {
     val (emoji, bg) = when (category) {
         VenueCategory.SKI -> "⛷️" to Color(0xFFE0F2FE)
         VenueCategory.SLED -> "🛷" to Color(0xFFFFE0B2)
@@ -1210,14 +1213,14 @@ fun CategoryBadge(category: VenueCategory) {
         VenueCategory.CULTURE -> "🏛️" to Color(0xFFFBE9E7)
     }
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(cornerRadius),
         color = bg,
-        modifier = Modifier.size(28.dp)
+        modifier = Modifier.size(size)
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             Text(
                 text = emoji,
-                fontSize = 15.sp,
+                fontSize = emojiSize,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
