@@ -51,7 +51,10 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import java.io.File
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -69,8 +72,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
-        Configuration.getInstance().userAgentValue = packageName
+
+        val osmConfig = Configuration.getInstance()
+        osmConfig.load(this, PreferenceManager.getDefaultSharedPreferences(this))
+        osmConfig.userAgentValue = "FreizeitticketTracker/1.1 (Android; contact: info@freizeitticket-tracker.local)"
+        osmConfig.osmdroidBasePath = File(cacheDir, "osmdroid")
+        osmConfig.osmdroidTileCache = File(osmConfig.osmdroidBasePath, "tiles")
 
         setContent {
             MaterialTheme(
@@ -95,6 +102,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showTarifDialog by remember { mutableStateOf(false) }
     var visitPendingDeletion by remember { mutableStateOf<VisitEntity?>(null) }
+    var visitPendingEdit by remember { mutableStateOf<VisitEntity?>(null) }
     val ticketConfig by viewModel.ticketConfig.collectAsState(initial = TicketConfig())
     val context = LocalContext.current
 
@@ -187,10 +195,12 @@ fun MainScreen(viewModel: TrackerViewModel) {
                 0 -> DashboardView(
                     viewModel = viewModel,
                     onOpenTarifDialog = { showTarifDialog = true },
+                    onRequestEditVisit = { visitPendingEdit = it },
                     onRequestDeleteVisit = { visitPendingDeletion = it }
                 )
                 1 -> CalendarView(
                     viewModel = viewModel,
+                    onRequestEditVisit = { visitPendingEdit = it },
                     onRequestDeleteVisit = { visitPendingDeletion = it }
                 )
                 2 -> OsmMapOverviewView()
@@ -205,6 +215,17 @@ fun MainScreen(viewModel: TrackerViewModel) {
                 onSave = { newConfig ->
                     viewModel.saveTicketConfig(newConfig)
                     showTarifDialog = false
+                }
+            )
+        }
+
+        visitPendingEdit?.let { visit ->
+            EditVisitDialog(
+                visit = visit,
+                onDismiss = { visitPendingEdit = null },
+                onSave = { updatedDate, updatedNotes ->
+                    viewModel.updateVisit(visit.copy(date = updatedDate, notes = updatedNotes))
+                    visitPendingEdit = null
                 }
             )
         }
@@ -252,6 +273,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
 fun DashboardView(
     viewModel: TrackerViewModel,
     onOpenTarifDialog: () -> Unit,
+    onRequestEditVisit: (VisitEntity) -> Unit,
     onRequestDeleteVisit: (VisitEntity) -> Unit
 ) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
@@ -437,7 +459,7 @@ fun DashboardView(
             ) {
                 Text("Letzte Aktivitäten", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                 if (visits.isNotEmpty()) {
-                    Text("🗑️ Antippen zum Löschen", fontSize = 12.sp, color = Color.Gray)
+                    Text("✏️ Ändern • 🗑️ Löschen", fontSize = 12.sp, color = Color.Gray)
                 }
             }
         }
@@ -462,7 +484,11 @@ fun DashboardView(
             }
         } else {
             items(visits) { visit ->
-                ModernVisitCard(visit = visit, onDelete = { onRequestDeleteVisit(visit) })
+                ModernVisitCard(
+                    visit = visit,
+                    onEdit = { onRequestEditVisit(visit) },
+                    onDelete = { onRequestDeleteVisit(visit) }
+                )
             }
         }
     }
@@ -512,6 +538,7 @@ fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.
 @Composable
 fun CalendarView(
     viewModel: TrackerViewModel,
+    onRequestEditVisit: (VisitEntity) -> Unit,
     onRequestDeleteVisit: (VisitEntity) -> Unit
 ) {
     val visits by viewModel.allVisits.collectAsState(initial = emptyList())
@@ -621,7 +648,11 @@ fun CalendarView(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(selectedVisits) { visit ->
-                    ModernVisitCard(visit = visit, onDelete = { onRequestDeleteVisit(visit) })
+                    ModernVisitCard(
+                        visit = visit,
+                        onEdit = { onRequestEditVisit(visit) },
+                        onDelete = { onRequestDeleteVisit(visit) }
+                    )
                 }
             }
         }
@@ -830,13 +861,16 @@ fun CategoryBadge(category: VenueCategory) {
     }
 }
 
-// ==========================================
-// MODERN VISIT CARD (VOLLSTÄNDIG GEFIXT)
-// ==========================================
 @Composable
-fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
+fun ModernVisitCard(
+    visit: VisitEntity,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -847,7 +881,6 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon links
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -860,7 +893,6 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Textbereich mitte: Erhält Modifier.weight(1f), damit er den rechten Bereich nie zusammendrückt
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = visit.venueName,
@@ -871,17 +903,27 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    softWrap = false
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        softWrap = false
+                    )
+                    if (visit.notes.isNotEmpty()) {
+                        Text(
+                            text = " • ${visit.notes}",
+                            fontSize = 12.sp,
+                            color = GlacierBlue,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Rechter Bereich: Betrag + Löschen (softWrap = false garantiert immer 1 Zeile)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End
@@ -893,11 +935,26 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
                     fontSize = 15.sp,
                     softWrap = false
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(GlacierBlue.copy(alpha = 0.10f))
+                ) {
+                    Icon(
+                        Icons.Rounded.EditCalendar,
+                        contentDescription = "Datum bearbeiten",
+                        tint = GlacierBlue,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(CoralWarning.copy(alpha = 0.10f))
                 ) {
@@ -905,7 +962,7 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
                         Icons.Rounded.DeleteOutline,
                         contentDescription = "Eintrag löschen",
                         tint = CoralWarning,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 }
             }
@@ -914,8 +971,9 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
 }
 
 // ==========================================
-// DIALOGE
+// DIALOGE (MANUELL EINTRAGEN & DATUM BEARBEITEN)
 // ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualVisitDialog(
     venues: List<Venue>,
@@ -923,12 +981,38 @@ fun ManualVisitDialog(
     onConfirm: (Venue, LocalDate, String) -> Unit
 ) {
     var selectedVenue by remember { mutableStateOf(venues.first()) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var notes by remember { mutableStateOf("") }
     var filterText by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val displayedVenues = remember(filterText) {
         if (filterText.isEmpty()) venues.take(6)
         else venues.filter { it.name.contains(filterText, ignoreCase = true) || it.subtitle.contains(filterText, ignoreCase = true) }.take(6)
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Übernehmen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 
     AlertDialog(
@@ -936,6 +1020,33 @@ fun ManualVisitDialog(
         title = { Text("Besuch manuell eintragen", fontWeight = FontWeight.Bold, color = AlpineDark) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDatePicker = true },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Datum des Ausflugs", fontSize = 11.sp, color = Color.Gray)
+                            Text(
+                                selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AlpineDark
+                            )
+                        }
+                        Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 OutlinedTextField(
                     value = filterText,
                     onValueChange = { filterText = it },
@@ -943,6 +1054,7 @@ fun ManualVisitDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
                 Spacer(modifier = Modifier.height(10.dp))
                 displayedVenues.forEach { v ->
                     Row(
@@ -950,11 +1062,11 @@ fun ManualVisitDialog(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { selectedVenue = v }
-                            .padding(vertical = 6.dp, horizontal = 4.dp),
+                            .padding(vertical = 5.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedVenue.id == v.id, onClick = { selectedVenue = v })
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = v.name,
@@ -972,14 +1084,119 @@ fun ManualVisitDialog(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    placeholder = { Text("Optionale Notiz (z. B. 'Neuschnee, Kaiserwetter')", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(selectedVenue, LocalDate.now(), notes) },
+                onClick = { onConfirm(selectedVenue, selectedDate, notes) },
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
             ) {
                 Text("Jetzt einbuchen")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditVisitDialog(
+    visit: VisitEntity,
+    onDismiss: () -> Unit,
+    onSave: (LocalDate, String) -> Unit
+) {
+    var editedDate by remember { mutableStateOf(visit.date) }
+    var editedNotes by remember { mutableStateOf(visit.notes) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = editedDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        editedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Übernehmen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text("Eintrag bearbeiten", fontWeight = FontWeight.Bold, color = AlpineDark)
+                Text(visit.venueName, fontSize = 13.sp, color = GlacierBlue, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDatePicker = true },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Datum anpassen", fontSize = 11.sp, color = Color.Gray)
+                            Text(
+                                editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AlpineDark
+                            )
+                        }
+                        Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = editedNotes,
+                    onValueChange = { editedNotes = it },
+                    label = { Text("Notiz") },
+                    placeholder = { Text("z. B. Skitour, Nachmittags...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(editedDate, editedNotes) },
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+            ) {
+                Text("Speichern")
             }
         },
         dismissButton = {

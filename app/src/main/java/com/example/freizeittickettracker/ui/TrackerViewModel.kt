@@ -1,58 +1,60 @@
 package com.example.freizeittickettracker.ui
 
+import android.annotation.SuppressLint
 import android.app.Application
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
-import android.content.Intent
-import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.freizeittickettracker.data.*
-import com.example.freizeittickettracker.widget.FreizeitticketWidget
-import kotlinx.coroutines.Dispatchers
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+
+data class UserLocation(val latitude: Double, val longitude: Double)
 
 class TrackerViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val visitDao = db.visitDao()
     private val configDao = db.configDao()
 
-    val allVisits: StateFlow<List<VisitEntity>> = visitDao.getAllVisits()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allVisits: Flow<List<VisitEntity>> = visitDao.getAllVisits()
+    val recentVisits: Flow<List<VisitEntity>> = visitDao.getAllVisits().map { it.take(10) }
 
-    val recentVisits: StateFlow<List<VisitEntity>> = visitDao.getRecentVisits()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val ticketConfig: Flow<TicketConfig> = configDao.getConfig().map { entity ->
+        entity?.toModel() ?: TicketConfig()
+    }
 
-    val ticketConfig: StateFlow<TicketConfig> = configDao.getConfig()
-        .map { it?.toModel() ?: TicketConfig() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TicketConfig())
+    private val _currentLocation = MutableStateFlow<UserLocation?>(null)
+    val currentLocation: StateFlow<UserLocation?> = _currentLocation.asStateFlow()
 
-    private val _currentLocation = MutableStateFlow<Location?>(null)
-    val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
-
-    val dashboardStats: StateFlow<DashboardStats> = combine(allVisits, ticketConfig) { visits, config ->
+    val dashboardStats: Flow<DashboardStats> = combine(allVisits, ticketConfig) { visits, config ->
+        val totalSaved = visits.sumOf { it.savedAmount }
         val price = config.getPrice()
-        val saved = visits.sumOf { it.savedAmount }
-        val remaining = (price - saved).coerceAtLeast(0.0)
-        val net = (saved - price).coerceAtLeast(0.0)
-        val progress = if (price > 0) (saved / price).toFloat() else 0f
+        val remaining = (price - totalSaved).coerceAtLeast(0.0)
+        val netSavings = (totalSaved - price).coerceAtLeast(0.0)
+        val progress = if (price > 0) (totalSaved / price).toFloat() else 0f
+        val isAmortized = totalSaved >= price
 
         DashboardStats(
-            tarifTitle = config.category.label + if (config.isEarlyBird) " (Vorverkauf)" else "",
+            tarifTitle = "${config.category.label} (${if (config.isEarlyBird) "Vorverkauf" else "Normal"})",
             purchasePrice = price,
-            totalValueSaved = saved,
+            totalValueSaved = totalSaved,
             remainingToAmortize = remaining,
-            netSavings = net,
+            netSavings = netSavings,
             amortizationProgress = progress,
-            isAmortized = saved >= price,
+            isAmortized = isAmortized,
             totalVisits = visits.size
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardStats())
+    }
 
-    fun recordVisit(venue: Venue, date: LocalDate = LocalDate.now(), notes: String = "") {
-        viewModelScope.launch(Dispatchers.IO) {
+    fun saveTicketConfig(config: TicketConfig) {
+        viewModelScope.launch {
+            configDao.saveConfig(config.toEntity())
+        }
+    }
+
+    fun recordVisit(venue: Venue, date: LocalDate, notes: String = "") {
+        viewModelScope.launch {
             val visit = VisitEntity(
                 venueId = venue.id,
                 venueName = venue.name,
@@ -62,37 +64,28 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 notes = notes
             )
             visitDao.insertVisit(visit)
-            notifyWidgetUpdate()
+        }
+    }
+
+    fun updateVisit(visit: VisitEntity) {
+        viewModelScope.launch {
+            visitDao.updateVisit(visit)
         }
     }
 
     fun deleteVisit(visit: VisitEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             visitDao.deleteVisit(visit)
-            notifyWidgetUpdate()
         }
     }
 
-    fun saveTicketConfig(newConfig: TicketConfig) {
-        viewModelScope.launch(Dispatchers.IO) {
-            configDao.saveConfig(newConfig.toEntity())
-            notifyWidgetUpdate()
-        }
-    }
-
+    @SuppressLint("MissingPermission")
     fun updateLocation() {
-        // GPS-Aktualisierung
-    }
-
-    private fun notifyWidgetUpdate() {
-        val context = getApplication<Application>()
-        val intent = Intent(context, FreizeitticketWidget::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            val ids = AppWidgetManager.getInstance(context).getAppWidgetIds(
-                ComponentName(context, FreizeitticketWidget::class.java)
-            )
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        val client = LocationServices.getFusedLocationProviderClient(getApplication<Application>())
+        client.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) {
+                _currentLocation.value = UserLocation(loc.latitude, loc.longitude)
+            }
         }
-        context.sendBroadcast(intent)
     }
 }
