@@ -25,9 +25,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
 
     val ticketConfig: Flow<TicketConfig> = database.ticketConfigDao().getConfig()
-        .map { it?.toModel() ?: TicketConfig() }
+        .map { entity: TicketConfigEntity? -> entity?.toModel() ?: TicketConfig() }
 
     val allVisits: Flow<List<VisitEntity>> = database.visitDao().getAllVisits()
+
+    val recentVisits: Flow<List<VisitEntity>> = database.visitDao().getRecentVisits()
 
     val seasonVisits: Flow<List<VisitEntity>> = combine(allVisits, _selectedSeason) { visits, season ->
         visits.filter { it.season == season }
