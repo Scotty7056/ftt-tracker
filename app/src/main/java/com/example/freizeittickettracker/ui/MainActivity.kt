@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,20 +40,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.preference.PreferenceManager
 import com.example.freizeittickettracker.R
 import com.example.freizeittickettracker.data.*
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.MapView
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// Alpin modern Farbpalette
 val AlpineDark = Color(0xFF0F1E2E)
 val AlpineNavy = Color(0xFF1B2E4B)
 val GlacierBlue = Color(0xFF0077B6)
@@ -65,6 +65,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
+        Configuration.getInstance().userAgentValue = packageName
+
         setContent {
             MaterialTheme(
                 colorScheme = lightColorScheme(
@@ -174,7 +177,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
             when (selectedTab) {
                 0 -> DashboardView(viewModel, onOpenTarifDialog = { showTarifDialog = true })
                 1 -> CalendarView(viewModel)
-                2 -> MapOverviewView(viewModel)
+                2 -> OsmMapOverviewView()
                 3 -> PartnerListView(viewModel)
             }
         }
@@ -193,7 +196,7 @@ fun MainScreen(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 1. DASHBOARD REDESIGN
+// 1. DASHBOARD
 // ==========================================
 @Composable
 fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
@@ -380,16 +383,8 @@ fun DashboardView(viewModel: TrackerViewModel, onOpenTarifDialog: () -> Unit) {
                     ) {
                         Icon(Icons.Rounded.Hiking, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(48.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            "Noch keine Ausflüge erfasst",
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
-                        )
-                        Text(
-                            "Tippe oben auf 'Besuch manuell eintragen'",
-                            fontSize = 12.sp,
-                            color = Color.LightGray
-                        )
+                        Text("Noch keine Ausflüge erfasst", fontWeight = FontWeight.SemiBold, color = Color.Gray)
+                        Text("Tippe oben auf 'Besuch manuell eintragen'", fontSize = 12.sp, color = Color.LightGray)
                     }
                 }
             }
@@ -440,7 +435,7 @@ fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.
 }
 
 // ==========================================
-// 2. KALENDER REDESIGN
+// 2. KALENDER
 // ==========================================
 @Composable
 fun CalendarView(viewModel: TrackerViewModel) {
@@ -559,55 +554,61 @@ fun CalendarView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 3. GOOGLE MAPS MIT CUSTOM BADGES
+// 3. OPENSTREETMAP KARTENANSICHT (OHNE GOOGLE KEY)
 // ==========================================
 @Composable
-fun MapOverviewView(viewModel: TrackerViewModel) {
+fun OsmMapOverviewView() {
     val venues = VenueCatalog.venues
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
 
     DisposableEffect(mapView) {
-        mapView.onCreate(null)
         mapView.onResume()
         onDispose {
             mapView.onPause()
-            mapView.onDestroy()
+            mapView.onDetach()
         }
     }
 
-    AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize()) { mv ->
-        mv.getMapAsync { googleMap ->
-            googleMap.uiSettings.isZoomControlsEnabled = true
-            val innsbruck = LatLng(47.2692, 11.4041)
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(innsbruck, 9.5f))
-            googleMap.clear()
+    AndroidView(
+        factory = {
+            mapView.apply {
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                controller.setZoom(9.5)
+                controller.setCenter(GeoPoint(47.2692, 11.4041)) // Innsbruck Zentrum
 
-            val skiIcon = bitmapDescriptorFromVector(context, R.drawable.ic_ski, android.graphics.Color.parseColor("#0077B6"))
-            val poolIcon = bitmapDescriptorFromVector(context, R.drawable.ic_pool, android.graphics.Color.parseColor("#00838F"))
-            val defaultIcon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                overlays.clear()
+                venues.forEach { venue ->
+                    val marker = Marker(this)
+                    marker.position = GeoPoint(venue.latitude, venue.longitude)
+                    marker.title = venue.name
+                    marker.snippet = "Tagestarif: ${venue.normalTicketPrice.formatEuro()}"
 
-            venues.forEach { venue ->
-                val markerIcon = when (venue.category) {
-                    VenueCategory.SKI -> skiIcon
-                    VenueCategory.POOL -> poolIcon
-                    else -> defaultIcon
+                    val pinColor = when (venue.category) {
+                        VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6")
+                        VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F")
+                        VenueCategory.ICE -> android.graphics.Color.parseColor("#5E35B1")
+                        VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315")
+                    }
+                    val iconRes = when (venue.category) {
+                        VenueCategory.SKI -> R.drawable.ic_ski
+                        VenueCategory.POOL -> R.drawable.ic_pool
+                        else -> R.drawable.ic_ski
+                    }
+                    marker.icon = createOsmMarkerDrawable(context, iconRes, pinColor)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    overlays.add(marker)
                 }
-                googleMap.addMarker(
-                    MarkerOptions()
-                        .position(LatLng(venue.latitude, venue.longitude))
-                        .title(venue.name)
-                        .snippet("Normaltarif: ${venue.normalTicketPrice.formatEuro()}")
-                        .icon(markerIcon)
-                        .anchor(0.5f, 0.5f)
-                )
+                invalidate()
             }
-        }
-    }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 // ==========================================
-// 4. PARTNERLISTE REDESIGN
+// 4. PARTNERLISTE
 // ==========================================
 @Composable
 fun PartnerListView(viewModel: TrackerViewModel) {
@@ -756,11 +757,7 @@ fun ModernVisitCard(visit: VisitEntity, onDelete: () -> Unit) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(visit.venueName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-                    Text(
-                        visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
+                    Text(visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), fontSize = 12.sp, color = Color.Gray)
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -853,9 +850,9 @@ fun TarifSelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ticket-Tarif anpassen", fontWeight = FontWeight.Bold) },
+        title = { Text("Ticket-Tarif anpassen", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = AlpineDark) },
         text = {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -869,14 +866,16 @@ fun TarifSelectionDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(checked = isEarlyBird, onCheckedChange = { isEarlyBird = it })
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("Günstigerer Preis bei Kauf vor Saisonstart", fontSize = 11.sp, color = Color.Gray)
+                            Text("Vergünstigter Preis vor Saisonstart", fontSize = 11.sp, color = Color.Gray)
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 for (category in TarifCategory.entries) {
                     val price = if (isEarlyBird) category.earlyBirdPrice else category.normalPrice
                     Row(
@@ -884,15 +883,23 @@ fun TarifSelectionDialog(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { selectedCategory = category }
-                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = selectedCategory == category, onClick = { selectedCategory = category })
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(category.label, fontSize = 13.sp)
-                            Text(price.formatEuro(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineDark)
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = category.label,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f) // Verhindert das vertikale Umbrechen
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = price.formatEuro(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = AlpineDark
+                        )
                     }
                 }
             }
@@ -924,12 +931,8 @@ fun calculateDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     return r * c
 }
 
-fun bitmapDescriptorFromVector(
-    context: Context,
-    vectorResId: Int,
-    backgroundColor: Int
-): BitmapDescriptor {
-    val sizePx = 96
+fun createOsmMarkerDrawable(context: Context, vectorResId: Int, backgroundColor: Int): BitmapDrawable {
+    val sizePx = 80
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -938,21 +941,22 @@ fun bitmapDescriptorFromVector(
         style = Paint.Style.FILL
     }
     val radius = sizePx / 2f
-    canvas.drawCircle(radius, radius, radius - 4f, paint)
+    canvas.drawCircle(radius, radius, radius - 3f, paint)
 
     val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 4f
+        strokeWidth = 3f
     }
-    canvas.drawCircle(radius, radius, radius - 4f, strokePaint)
+    canvas.drawCircle(radius, radius, radius - 3f, strokePaint)
 
-    val drawable = ContextCompat.getDrawable(context, vectorResId) ?: return BitmapDescriptorFactory.defaultMarker()
-    drawable.setTint(android.graphics.Color.WHITE)
+    val drawable = ContextCompat.getDrawable(context, vectorResId)
+    drawable?.let {
+        it.setTint(android.graphics.Color.WHITE)
+        val pad = 18
+        it.setBounds(pad, pad, sizePx - pad, sizePx - pad)
+        it.draw(canvas)
+    }
 
-    val iconPadding = 22
-    drawable.setBounds(iconPadding, iconPadding, sizePx - iconPadding, sizePx - iconPadding)
-    drawable.draw(canvas)
-
-    return BitmapDescriptorFactory.fromBitmap(bitmap)
+    return BitmapDrawable(context.resources, bitmap)
 }
