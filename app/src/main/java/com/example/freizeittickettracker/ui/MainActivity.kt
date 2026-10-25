@@ -210,7 +210,6 @@ fun MainScreen(viewModel: TrackerViewModel) {
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        // Saison-Wechsler Dropdown
                         var expandedSeason by remember { mutableStateOf(false) }
                         Box {
                             FilledTonalButton(
@@ -624,7 +623,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // FTT Wrapped Header Card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -668,7 +666,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             }
         }
 
-        // Kategorie-Splitting
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -709,7 +706,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             }
         }
 
-        // Top 3 Gebiete
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -739,7 +735,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             }
         }
 
-        // Auto-Backup & Export
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -795,7 +790,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
 }
 
 // ==========================================
-// 3. KALENDER, KARTE & PARTNER
+// 3. KALENDER & KARTE
 // ==========================================
 @Composable
 fun CalendarView(
@@ -915,13 +910,21 @@ fun CalendarView(
 }
 
 @Composable
-fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
+fun OsmMapOverviewView(
+    viewModel: TrackerViewModel,
+    focusVenue: Venue? = null
+) {
     val venues = VenueCatalog.venues
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
     val markerMap = remember { mutableMapOf<String, Marker>() }
     val userLocation by viewModel.currentLocation.collectAsState(initial = null)
     var userLocationMarker by remember { mutableStateOf<Marker?>(null) }
+    val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
+    val today = remember { LocalDate.now() }
+    val visitedVenueIdsToday = remember(allVisits) {
+        allVisits.filter { it.date == today }.map { it.venueId }.toSet()
+    }
 
     val openTopoTileSource = remember {
         XYTileSource(
@@ -984,10 +987,21 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
                     userLocationMarker = null
 
                     venues.forEach { venue ->
+                        val isVisited = visitedVenueIdsToday.contains(venue.id)
+
                         val marker = object : Marker(this) {
                             override fun onLongPress(event: android.view.MotionEvent?, mapView: MapView?): Boolean {
                                 val touched = hitTest(event, mapView)
                                 if (touched) {
+                                    if (visitedVenueIdsToday.contains(venue.id)) {
+                                        Toast.makeText(
+                                            context,
+                                            "⚠️ ${venue.name} wurde heute bereits verbucht!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        return true
+                                    }
+
                                     mapView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
                                     viewModel.recordVisit(
                                         venue = venue,
@@ -1008,7 +1022,11 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
 
                         marker.position = GeoPoint(venue.latitude, venue.longitude)
                         marker.title = venue.name
-                        marker.snippet = "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
+                        marker.snippet = if (isVisited) {
+                            "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n✅ Heute bereits erfasst"
+                        } else {
+                            "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
+                        }
 
                         val (pinColor, emoji) = when (venue.category) {
                             VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
@@ -1017,10 +1035,9 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
                             VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "🏊"
                             VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "🏛️"
                         }
-                        marker.icon = createOsmMarkerDrawable(context, emoji, pinColor)
+                        marker.icon = createOsmMarkerDrawable(context, emoji, pinColor, isVisited)
                         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
 
-                        // InfoWindow für Klick / LongClick
                         marker.infoWindow = object : org.osmdroid.views.overlay.infowindow.BasicInfoWindow(
                             org.osmdroid.library.R.layout.bonuspack_bubble,
                             this
@@ -1031,18 +1048,26 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
                                 mView?.isLongClickable = true
 
                                 val triggerBooking = {
-                                    mView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
-                                    viewModel.recordVisit(
-                                        venue = venue,
-                                        date = LocalDate.now(),
-                                        notes = "Per Schnellbuchung (Bubble) erfasst"
-                                    )
-                                    Toast.makeText(
-                                        context,
-                                        "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) eingebucht!",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    close()
+                                    if (visitedVenueIdsToday.contains(venue.id)) {
+                                        Toast.makeText(
+                                            context,
+                                            "⚠️ ${venue.name} wurde heute bereits verbucht!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        mView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                        viewModel.recordVisit(
+                                            venue = venue,
+                                            date = LocalDate.now(),
+                                            notes = "Per Schnellbuchung (Bubble) erfasst"
+                                        )
+                                        Toast.makeText(
+                                            context,
+                                            "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) eingebucht!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        close()
+                                    }
                                 }
 
                                 mView?.setOnLongClickListener {
@@ -1100,6 +1125,9 @@ fun OsmMapOverviewView(viewModel: TrackerViewModel, focusVenue: Venue? = null) {
     }
 }
 
+// ==========================================
+// 4. PARTNERLISTE & DETAILS
+// ==========================================
 @Composable
 fun PartnerListView(
     viewModel: TrackerViewModel,
@@ -1204,9 +1232,6 @@ fun PartnerListView(
     }
 }
 
-// ==========================================
-// 4. DETAIL-MODAL-BOTTOM-SHEET
-// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VenueDetailBottomSheet(
@@ -1343,7 +1368,7 @@ fun VenueDetailBottomSheet(
 }
 
 // ==========================================
-// 5. DIALOGE & KOMPONENTEN
+// 5. BADGES, CARDS & DIALOGE
 // ==========================================
 @Composable
 fun CategoryBadge(
@@ -1764,20 +1789,56 @@ fun calculateDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double):
     return r * c
 }
 
-fun createOsmMarkerDrawable(context: Context, emoji: String, backgroundColor: Int): BitmapDrawable {
+fun createOsmMarkerDrawable(context: Context, emoji: String, backgroundColor: Int, isVisitedToday: Boolean = false): BitmapDrawable {
     val sizePx = 92
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; style = Paint.Style.FILL }
+    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isVisitedToday) android.graphics.Color.parseColor("#10B981") else android.graphics.Color.WHITE
+        style = Paint.Style.FILL
+    }
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 2f, borderPaint)
 
-    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = backgroundColor; style = Paint.Style.FILL }
+    val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = backgroundColor
+        style = Paint.Style.FILL
+    }
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f - 7f, bgPaint)
 
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 42f; textAlign = Paint.Align.CENTER }
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 42f
+        textAlign = Paint.Align.CENTER
+    }
     val yPos = (canvas.height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f)
     canvas.drawText(emoji, canvas.width / 2f, yPos, textPaint)
+
+    if (isVisitedToday) {
+        val badgeRadius = 14f
+        val badgeX = sizePx - badgeRadius - 2f
+        val badgeY = badgeRadius + 2f
+
+        val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(badgeX, badgeY, badgeRadius + 2f, badgeBgPaint)
+
+        val checkCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#10B981")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(badgeX, badgeY, badgeRadius, checkCirclePaint)
+
+        val checkTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 18f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        val checkY = badgeY - ((checkTextPaint.descent() + checkTextPaint.ascent()) / 2f)
+        canvas.drawText("✓", badgeX, checkY, checkTextPaint)
+    }
 
     return BitmapDrawable(context.resources, bitmap)
 }
