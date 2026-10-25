@@ -569,6 +569,23 @@ fun DashboardView(
             items(visits) { visit ->
                 ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
             }
+
+        item {
+            val pInfo = try {
+                LocalContext.current.packageManager.getPackageInfo(LocalContext.current.packageName, 0)
+            } catch (_: Exception) { null }
+            val vName = pInfo?.versionName ?: "1.2"
+            
+            Text(
+                text = "FTT Tracker v$vName",
+                fontSize = 11.sp,
+                color = Color.LightGray,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                textAlign = TextAlign.Center
+            )
+        }
         }
     }
 
