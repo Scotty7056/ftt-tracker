@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,8 +47,9 @@ import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import com.example.freizeittickettracker.R
 import com.example.freizeittickettracker.data.*
+import com.example.freizeittickettracker.receiver.AppGeofenceManager
 import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -73,11 +75,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // OSMDroid Konfiguration sauber mit App-spezifischem Cache und User-Agent laden
         val osmConfig = Configuration.getInstance()
         osmConfig.load(this, PreferenceManager.getDefaultSharedPreferences(this))
-        osmConfig.userAgentValue = "FreizeitticketTracker/1.1 (Android; contact: info@freizeitticket-tracker.local)"
-        osmConfig.osmdroidBasePath = File(cacheDir, "osmdroid")
-        osmConfig.osmdroidTileCache = File(osmConfig.osmdroidBasePath, "tiles")
+        osmConfig.userAgentValue = "${packageName}/1.1 (Android; https://github.com/Scotty7056/freizeitticket-tracker)"
+        
+        val osmCacheDir = File(cacheDir, "osm_tiles")
+        if (!osmCacheDir.exists()) osmCacheDir.mkdirs()
+        osmConfig.osmdroidBasePath = osmCacheDir
+        osmConfig.osmdroidTileCache = osmCacheDir
 
         setContent {
             MaterialTheme(
@@ -103,25 +109,76 @@ fun MainScreen(viewModel: TrackerViewModel) {
     var showTarifDialog by remember { mutableStateOf(false) }
     var visitPendingDeletion by remember { mutableStateOf<VisitEntity?>(null) }
     var visitPendingEdit by remember { mutableStateOf<VisitEntity?>(null) }
+    var showBackgroundRationaleDialog by remember { mutableStateOf(false) }
+
     val ticketConfig by viewModel.ticketConfig.collectAsState(initial = TicketConfig())
     val context = LocalContext.current
+    val geofenceManager = remember { AppGeofenceManager(context) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val backgroundLocationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            geofenceManager.registerAllVenues()
+        }
+    }
+
+    val basePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+        val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        if (fineLocationGranted) {
             viewModel.updateLocation()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val hasBackground = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (!hasBackground) {
+                    showBackgroundRationaleDialog = true
+                } else {
+                    geofenceManager.registerAllVenues()
+                }
+            } else {
+                geofenceManager.registerAllVenues()
+            }
         }
     }
 
     LaunchedEffect(Unit) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED) {
-            permissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            )
+        val permissionsToRequest = mutableListOf<String>()
+
+        val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasNotification = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            if (!hasNotification) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            basePermissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             viewModel.updateLocation()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val hasBackground = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+                if (!hasBackground) {
+                    showBackgroundRationaleDialog = true
+                } else {
+                    geofenceManager.registerAllVenues()
+                }
+            } else {
+                geofenceManager.registerAllVenues()
+            }
         }
     }
 
@@ -215,6 +272,44 @@ fun MainScreen(viewModel: TrackerViewModel) {
                 onSave = { newConfig ->
                     viewModel.saveTicketConfig(newConfig)
                     showTarifDialog = false
+                }
+            )
+        }
+
+        if (showBackgroundRationaleDialog) {
+            AlertDialog(
+                onDismissRequest = { showBackgroundRationaleDialog = false },
+                icon = {
+                    Icon(
+                        Icons.Rounded.LocationOn,
+                        contentDescription = null,
+                        tint = GlacierBlue,
+                        modifier = Modifier.size(36.dp)
+                    )
+                },
+                title = { Text("Automatische Erkennung im Hintergrund", fontWeight = FontWeight.Bold, color = AlpineDark) },
+                text = {
+                    Text(
+                        "Damit dich die App beim Erreichen einer Liftstation oder eines Bades per Push-Nachricht an das Einbuchen erinnern kann, wähle im nächsten Schritt bitte 'Immer zulassen'.\n\nDie Erkennung erfolgt akkuschonend über Geofences."
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showBackgroundRationaleDialog = false
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+                    ) {
+                        Text("Weiter zu 'Immer zulassen'")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showBackgroundRationaleDialog = false }) {
+                        Text("Später", color = Color.Gray)
+                    }
                 }
             )
         }
@@ -660,13 +755,30 @@ fun CalendarView(
 }
 
 // ==========================================
-// 3. OPENSTREETMAP KARTENANSICHT
+// 3. OPENSTREETMAP KARTENANSICHT (MIT FREIEM CARTO/OSM-SERVER)
 // ==========================================
 @Composable
 fun OsmMapOverviewView() {
     val venues = VenueCatalog.venues
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+
+    // CARTO Voyager Kachel-Quelle (schnell, zuverlässig und ohne Tile-Usage-403)
+    val cartoTileSource = remember {
+        XYTileSource(
+            "CartoVoyager",
+            0,
+            19,
+            256,
+            ".png",
+            arrayOf(
+                "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+                "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+                "https://c.basemaps.cartocdn.com/rastertiles/voyager/"
+            ),
+            "© OpenStreetMap contributors © CARTO"
+        )
+    }
 
     DisposableEffect(mapView) {
         mapView.onResume()
@@ -679,7 +791,9 @@ fun OsmMapOverviewView() {
     AndroidView(
         factory = {
             mapView.apply {
-                setTileSource(TileSourceFactory.MAPNIK)
+                // Kacheln leeren, falls alte Fehler-Kacheln im RAM liegen
+                tileProvider.clearTileCache()
+                setTileSource(cartoTileSource)
                 setMultiTouchControls(true)
                 controller.setZoom(9.5)
                 controller.setCenter(GeoPoint(47.2692, 11.4041))
