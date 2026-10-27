@@ -193,6 +193,7 @@ fun MainScreen(
     ) { permissions ->
         if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
             viewModel.updateLocation()
+            viewModel.checkAutoPriceSync()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val hasBackground = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
                 if (!hasBackground) showBackgroundRationaleDialog = true else geofenceManager.registerAllVenues()
@@ -215,6 +216,7 @@ fun MainScreen(
             basePermissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             viewModel.updateLocation()
+            viewModel.checkAutoPriceSync()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     showBackgroundRationaleDialog = true
@@ -1161,6 +1163,7 @@ fun OsmMapOverviewView(
                 }
 
                 viewModel.updateLocation()
+            viewModel.checkAutoPriceSync()
                 userLocation?.let { loc ->
                     mapView.controller.animateTo(GeoPoint(loc.latitude, loc.longitude), 13.5, 900L)
                 } ?: run {
@@ -2004,6 +2007,20 @@ fun TarifSelectionDialog(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        viewModel.manualPriceSync { success, msg ->
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Partnertarife jetzt online abgleichen", fontSize = 12.sp)
+                }
 
                 for (category in TarifCategory.entries) {
                     val price = if (isEarlyBird) category.earlyBirdPrice else category.normalPrice
