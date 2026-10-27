@@ -1481,6 +1481,12 @@ fun VenueDetailBottomSheet(
                             fontWeight = FontWeight.Bold,
                             color = AlpineDark
                         )
+                        Text(
+                            text = "Zugeordnete Saison: ${getSeasonForDate(selectedDate)}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlacierBlue
+                        )
                     }
                     TextButton(onClick = { showDatePicker = true }) {
                         Text("Datum ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
