@@ -656,6 +656,22 @@ fun StatisticsView(viewModel: TrackerViewModel) {
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val text = stream.bufferedReader().readText()
+                    viewModel.importVisitsFromCsv(text) { count ->
+                        Toast.makeText(context, "✅ $count Einträge erfolgreich importiert!", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Fehler beim Import: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     val categoryStats = remember(visits) {
         val total = visits.sumOf { it.savedAmount }
@@ -826,71 +842,21 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("CSV Export", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Export", fontSize = 11.sp, maxLines = 1)
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = {
-                                coroutineScope.launch {
-                                    AutoBackupManager.performAutoBackup(context, visits)
-                                    Toast.makeText(context, "✅ Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
-                                }
+                                importLauncher.launch(arrayOf("text/*", "text/comma-separated-values", "text/csv", "application/csv"))
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Backup jetzt", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ==========================================
-// 3. KALENDER & KARTE
-// ==========================================
-@Composable
-fun CalendarView(
-    viewModel: TrackerViewModel,
-    onRequestEditVisit: (VisitEntity) -> Unit,
-    onRequestDeleteVisit: (VisitEntity) -> Unit
-) {
-    val visits by viewModel.allVisits.collectAsState(initial = emptyList())
-    var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-
-    val daysInMonth = remember(currentMonth) {
-        val firstDay = currentMonth.atDay(1)
-        val firstDayOfWeek = firstDay.dayOfWeek.value
-        val length = currentMonth.lengthOfMonth()
-        val days = mutableListOf<LocalDate?>()
-        for (i in 1 until firstDayOfWeek) days.add(null)
-        for (i in 1..length) days.add(currentMonth.atDay(i))
-        days
-    }
-
-    val visitDates = remember(visits) { visits.map { it.date }.toSet() }
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                            Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Import", fontSize = 11.sp, maxLines = 1)
+                        } {
                         Icon(Icons.Rounded.ChevronLeft, contentDescription = "Zurück")
                     }
                     Text(
