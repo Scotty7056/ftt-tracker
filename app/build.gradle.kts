@@ -27,9 +27,13 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("keystore.jks")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "meinpasswort123"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "fttkey"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "meinpasswort123"
+            val sPass = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "meinpasswort123"
+            val kAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "fttkey"
+            val kPass = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "meinpasswort123"
+
+            storePassword = sPass
+            keyAlias = kAlias
+            keyPassword = kPass
         }
     }
 

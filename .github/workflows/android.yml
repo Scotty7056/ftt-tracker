@@ -3,9 +3,11 @@ name: Android CI Build & Release Sign
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -26,15 +28,17 @@ jobs:
       run: chmod +x gradlew
 
     - name: Decode Keystore from Secret
+      env:
+        KEYSTORE_RAW: ${{ secrets.KEYSTORE_BASE64 }}
       run: |
-        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+        echo "$KEYSTORE_RAW" | base64 --decode > app/keystore.jks
         ls -la app/keystore.jks
 
     - name: Build Release APK
       env:
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        KEYSTORE_PASSWORD: "meinpasswort123"
+        KEY_ALIAS: "fttkey"
+        KEY_PASSWORD: "meinpasswort123"
       run: ./gradlew assembleRelease -PappVersionCode=${{ github.run_number }} --stacktrace
 
     - name: Upload Signed APK Artifact
