@@ -569,7 +569,7 @@ fun DashboardView(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricTile("Ausflüge (${stats.season})", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
                 val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
-                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.AutoMirrored.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
+                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
             }
         }
 

@@ -1,44 +1,24 @@
 package com.example.freizeittickettracker.data
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.time.LocalDate
 
 object AutoBackupManager {
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
-
-    suspend fun performAutoBackup(context: Context, visits: List<VisitEntity>) = withContext(Dispatchers.IO) {
-        try {
-            val backupDir = File(context.filesDir, "backups")
-            if (!backupDir.exists()) backupDir.mkdirs()
-
-            val latestFile = File(backupDir, "ftt_autobackup_latest.json")
-            latestFile.writeText(json.encodeToString(visits))
-
-            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-            val archiveFile = File(backupDir, "ftt_backup_$timestamp.json")
-            archiveFile.writeText(json.encodeToString(visits))
-
-            // Maximal die letzten 5 Backups aufbewahren
-            val files = backupDir.listFiles { _, name -> name.startsWith("ftt_backup_") } ?: emptyArray()
-            if (files.size > 5) {
-                files.sortedBy { it.lastModified() }.take(files.size - 5).forEach { it.delete() }
-            }
-        } catch (_: Exception) {}
+    fun exportCsv(visits: List<VisitEntity>): String {
+        val sb = StringBuilder()
+        sb.append("Datum;Gebiet;Kategorie;Ersparnis;Saison;Notizen\n")
+        for (v in visits) {
+            sb.append("${v.date};${v.venueName};${v.category};${v.savedAmount};${v.season};${v.notes}\n")
+        }
+        return sb.toString()
     }
 
-    suspend fun exportCsv(visits: List<VisitEntity>): String = withContext(Dispatchers.Default) {
-        val sb = StringBuilder()
-        sb.append("ID;Datum;Saison;Kategorie;Gebiet;Ersparnis_EUR;Notiz\n")
-        visits.forEach {
-            sb.append("${it.id};${it.date};${it.season};${it.category};\"${it.venueName}\";${it.savedAmount};\"${it.notes}\"\n")
-        }
-        sb.toString()
+    fun performAutoBackup(context: Context, visits: List<VisitEntity>) {
+        try {
+            val file = File(context.filesDir, "ftt_auto_backup.csv")
+            file.writeText(exportCsv(visits))
+        } catch (_: Exception) {}
     }
 
     fun parseCsvToVisits(csvContent: String): List<VisitEntity> {
@@ -61,9 +41,9 @@ object AutoBackupManager {
                     val day = parts[0].padStart(2, '0')
                     val month = parts[1].padStart(2, '0')
                     val year = if (parts[2].length == 2) "20${parts[2]}" else parts[2]
-                    java.time.LocalDate.parse("$year-$month-$day")
+                    LocalDate.parse("$year-$month-$day")
                 } else {
-                    java.time.LocalDate.parse(rawDate)
+                    LocalDate.parse(rawDate)
                 }
             } catch (_: Exception) {
                 continue
@@ -86,7 +66,14 @@ object AutoBackupManager {
                 matchedVenue?.normalTicketPrice ?: 0.0
             }
 
-            val notes = if (tokens.size > 4) tokens.drop(4).joinToString(" ") else "CSV Import"
+            val notes = if (tokens.size > 5) {
+                tokens.drop(5).joinToString(" ")
+            } else if (tokens.size == 5 && !tokens[4].contains("/")) {
+                tokens[4]
+            } else {
+                "CSV Import"
+            }
+
             val season = getSeasonForDate(parsedDate)
 
             parsedVisits.add(
