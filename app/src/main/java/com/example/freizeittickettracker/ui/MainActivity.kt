@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
-import com.example.freizeittickettracker.R
 import com.example.freizeittickettracker.data.*
 import com.example.freizeittickettracker.receiver.AppGeofenceManager
 import io.ktor.client.*
@@ -368,6 +367,7 @@ fun MainScreen(
         if (showTarifDialog) {
             TarifSelectionDialog(
                 currentConfig = ticketConfig,
+                viewModel = viewModel,
                 onDismiss = { showTarifDialog = false },
                 onSave = { newConfig ->
                     viewModel.saveTicketConfig(newConfig)
@@ -569,7 +569,7 @@ fun DashboardView(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricTile("Ausflüge (${stats.season})", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
                 val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
-                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
+                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.AutoMirrored.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
             }
         }
 
@@ -650,7 +650,7 @@ fun DashboardView(
 }
 
 // ==========================================
-// 2. STATISTIKEN & FTT WRAPPED
+// 2. STATISTIKEN, EXPORT & IMPORT
 // ==========================================
 @Composable
 fun StatisticsView(viewModel: TrackerViewModel) {
@@ -658,6 +658,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -824,7 +825,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Datensicherung & Export", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-                    Text("Automatische Sicherung ist aktiv. Du kannst deine Daten zusätzlich exportieren.", fontSize = 12.sp, color = Color.Gray)
+                    Text("Daten per CSV sichern oder aus alten Notizen importieren.", fontSize = 12.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -858,7 +859,69 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Import", fontSize = 11.sp, maxLines = 1)
-                        } {
+                        }
+
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    AutoBackupManager.performAutoBackup(context, visits)
+                                    Toast.makeText(context, "✅ Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Backup", fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 3. KALENDER & KARTE
+// ==========================================
+@Composable
+fun CalendarView(
+    viewModel: TrackerViewModel,
+    onRequestEditVisit: (VisitEntity) -> Unit,
+    onRequestDeleteVisit: (VisitEntity) -> Unit
+) {
+    val visits by viewModel.allVisits.collectAsState(initial = emptyList())
+    var currentMonth by remember { mutableStateOf(YearMonth.now()) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+
+    val daysInMonth = remember(currentMonth) {
+        val firstDay = currentMonth.atDay(1)
+        val firstDayOfWeek = firstDay.dayOfWeek.value
+        val length = currentMonth.lengthOfMonth()
+        val days = mutableListOf<LocalDate?>()
+        for (i in 1 until firstDayOfWeek) days.add(null)
+        for (i in 1..length) days.add(currentMonth.atDay(i))
+        days
+    }
+
+    val visitDates = remember(visits) { visits.map { it.date }.toSet() }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
                         Icon(Icons.Rounded.ChevronLeft, contentDescription = "Zurück")
                     }
                     Text(
@@ -1007,6 +1070,7 @@ fun OsmMapOverviewView(
         venues.forEach { v ->
             markerMap[v.id]?.let { m ->
                 val isVisited = visitedVenueIdsToday.contains(v.id)
+                val currentPrice = PriceSyncManager.getCustomPrice(context, v.id, v.normalTicketPrice)
                 val (pinColor, emoji) = when (v.category) {
                     VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
                     VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "🛷"
@@ -1016,9 +1080,9 @@ fun OsmMapOverviewView(
                 }
                 m.icon = createOsmMarkerDrawable(context, emoji, pinColor, isVisited)
                 m.snippet = if (isVisited) {
-                    "${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}\n✅ Heute bereits erfasst"
+                    "${v.category.displayName} • ${currentPrice.formatEuro()}\n✅ Heute bereits erfasst"
                 } else {
-                    "${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
+                    "${v.category.displayName} • ${currentPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
                 }
             }
         }
@@ -1041,6 +1105,7 @@ fun OsmMapOverviewView(
 
                     venues.forEach { venue ->
                         val isVisited = visitedVenueIdsToday.contains(venue.id)
+                        val effectivePrice = PriceSyncManager.getCustomPrice(context, venue.id, venue.normalTicketPrice)
 
                         val marker = object : Marker(this) {
                             override fun onLongPress(event: android.view.MotionEvent?, mapView: MapView?): Boolean {
@@ -1060,11 +1125,12 @@ fun OsmMapOverviewView(
                                     viewModel.recordVisit(
                                         venue = venue,
                                         date = LocalDate.now(),
-                                        notes = "Per Schnellbuchung (Pin) erfasst"
+                                        notes = "Per Schnellbuchung (Pin) erfasst",
+                                        customAmount = effectivePrice
                                     )
                                     Toast.makeText(
                                         context,
-                                        "⚡ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) direkt eingebucht!",
+                                        "⚡ ${venue.name} (+${effectivePrice.formatEuro()}) direkt eingebucht!",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                     closeInfoWindow()
@@ -1077,9 +1143,9 @@ fun OsmMapOverviewView(
                         marker.position = GeoPoint(venue.latitude, venue.longitude)
                         marker.title = venue.name
                         marker.snippet = if (isVisited) {
-                            "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n✅ Heute bereits erfasst"
+                            "${venue.category.displayName} • ${effectivePrice.formatEuro()}\n✅ Heute bereits erfasst"
                         } else {
-                            "${venue.category.displayName} • ${venue.normalTicketPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
+                            "${venue.category.displayName} • ${effectivePrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
                         }
 
                         val (pinColor, emoji) = when (venue.category) {
@@ -1114,11 +1180,12 @@ fun OsmMapOverviewView(
                                         viewModel.recordVisit(
                                             venue = venue,
                                             date = LocalDate.now(),
-                                            notes = "Per Schnellbuchung (Bubble) erfasst"
+                                            notes = "Per Schnellbuchung (Bubble) erfasst",
+                                            customAmount = effectivePrice
                                         )
                                         Toast.makeText(
                                             context,
-                                            "✅ ${venue.name} (+${venue.normalTicketPrice.formatEuro()}) eingebucht!",
+                                            "✅ ${venue.name} (+${effectivePrice.formatEuro()}) eingebucht!",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                         close()
@@ -1163,7 +1230,6 @@ fun OsmMapOverviewView(
                 }
 
                 viewModel.updateLocation()
-            viewModel.checkAutoPriceSync()
                 userLocation?.let { loc ->
                     mapView.controller.animateTo(GeoPoint(loc.latitude, loc.longitude), 13.5, 900L)
                 } ?: run {
@@ -1190,6 +1256,7 @@ fun PartnerListView(
     onNavigateToMap: (Venue) -> Unit,
     onOpenDetail: (Venue) -> Unit
 ) {
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<VenueCategory?>(null) }
     val userLocation by viewModel.currentLocation.collectAsState(initial = null)
@@ -1242,6 +1309,7 @@ fun PartnerListView(
         Spacer(modifier = Modifier.height(10.dp))
         LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(filteredVenues) { venue ->
+                val effectivePrice = PriceSyncManager.getCustomPrice(context, venue.id, venue.normalTicketPrice)
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onOpenDetail(venue) },
                     shape = RoundedCornerShape(16.dp),
@@ -1264,7 +1332,7 @@ fun PartnerListView(
                                 Text(venue.subtitle, fontSize = 11.sp, color = Color.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Regulärer Tarif: ${venue.normalTicketPrice.formatEuro()}", fontSize = 12.sp, color = Color.Gray, softWrap = false)
+                            Text("Regulärer Tarif: ${effectivePrice.formatEuro()}", fontSize = 12.sp, color = Color.Gray, softWrap = false)
                         }
                         userLocation?.let { loc ->
                             Spacer(modifier = Modifier.width(8.dp))
@@ -1297,9 +1365,11 @@ fun VenueDetailBottomSheet(
     onNavigateToMap: () -> Unit,
     onBookVisit: (LocalDate, Double, String) -> Unit
 ) {
+    val context = LocalContext.current
+    val effectivePrice = remember(venue) { PriceSyncManager.getCustomPrice(context, venue.id, venue.normalTicketPrice) }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var priceText by remember(venue) { mutableStateOf(String.format(Locale.US, "%.2f", venue.normalTicketPrice)) }
+    var priceText by remember(effectivePrice) { mutableStateOf(String.format(Locale.US, "%.2f", effectivePrice)) }
     var visitNotes by remember { mutableStateOf("") }
     var showDuplicateWarning by remember { mutableStateOf(false) }
 
@@ -1354,20 +1424,20 @@ fun VenueDetailBottomSheet(
                         Text("Status", color = Color.Gray, fontSize = 13.sp)
                         Text("● Regulärer Betrieb", color = EmeraldGain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
-                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Öffnungszeiten", color = Color.Gray, fontSize = 13.sp)
                         Text("08:30 – 16:30 Uhr", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
-                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(if (venue.category == VenueCategory.SKI) "Schneelage (Berg/Tal)" else "Bedingungen", color = Color.Gray, fontSize = 13.sp)
                         Text(if (venue.category == VenueCategory.SKI) "125 cm / 40 cm" else "Sehr gut präpariert", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
-                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Einzelticket (Normalpreis)", color = Color.Gray, fontSize = 13.sp)
-                        Text(venue.normalTicketPrice.formatEuro(), fontWeight = FontWeight.Bold, color = GlacierBlue, fontSize = 14.sp)
+                        Text(effectivePrice.formatEuro(), fontWeight = FontWeight.Bold, color = GlacierBlue, fontSize = 14.sp)
                     }
                 }
             }
@@ -1479,14 +1549,14 @@ fun VenueDetailBottomSheet(
                 singleLine = true
             )
 
-            if (venue.normalTicketPrice != (priceText.toDoubleOrNull() ?: 0.0)) {
+            if (effectivePrice != (priceText.toDoubleOrNull() ?: 0.0)) {
                 Text(
-                    text = "Zurücksetzen auf Normaltarif (${venue.normalTicketPrice.formatEuro()})",
+                    text = "Zurücksetzen auf Standardtarif (${effectivePrice.formatEuro()})",
                     fontSize = 11.sp,
                     color = GlacierBlue,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
-                        .clickable { priceText = String.format(Locale.US, "%.2f", venue.normalTicketPrice) }
+                        .clickable { priceText = String.format(Locale.US, "%.2f", effectivePrice) }
                         .padding(top = 4.dp, start = 2.dp)
                 )
             }
@@ -1542,7 +1612,7 @@ fun VenueDetailBottomSheet(
                         if (isAlreadyBookedOnDate && !showDuplicateWarning) {
                             showDuplicateWarning = true
                         } else {
-                            val finalPrice = priceText.toDoubleOrNull() ?: venue.normalTicketPrice
+                            val finalPrice = priceText.toDoubleOrNull() ?: effectivePrice
                             val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Über Partneransicht erfasst"
                             onBookVisit(selectedDate, finalPrice, finalNote)
                         }
@@ -1693,16 +1763,21 @@ fun ManualVisitDialog(
     onDismiss: () -> Unit,
     onConfirm: (Venue, LocalDate, Double, String) -> Unit
 ) {
+    val context = LocalContext.current
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var priceText by remember { mutableStateOf(String.format(Locale.US, "%.2f", venues.first().normalTicketPrice)) }
+    var priceText by remember {
+        val initialEffective = PriceSyncManager.getCustomPrice(context, venues.first().id, venues.first().normalTicketPrice)
+        mutableStateOf(String.format(Locale.US, "%.2f", initialEffective))
+    }
     var notes by remember { mutableStateOf("") }
     var filterText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showDuplicateWarning by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedVenue) {
-        priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice)
+        val effective = PriceSyncManager.getCustomPrice(context, selectedVenue.id, selectedVenue.normalTicketPrice)
+        priceText = String.format(Locale.US, "%.2f", effective)
     }
 
     val displayedVenues = remember(filterText) {
@@ -1748,6 +1823,7 @@ fun ManualVisitDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Datum des Ausflugs", fontSize = 11.sp, color = Color.Gray)
                             Text(selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                            Text("Zugeordnete Saison: ${getSeasonForDate(selectedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
                         }
                         Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
@@ -1765,6 +1841,7 @@ fun ManualVisitDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
                 displayedVenues.forEach { v ->
+                    val effective = PriceSyncManager.getCustomPrice(context, v.id, v.normalTicketPrice)
                     Row(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { selectedVenue = v }.padding(vertical = 4.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1773,7 +1850,7 @@ fun ManualVisitDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(v.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${v.category.displayName} • ${v.normalTicketPrice.formatEuro()}", fontSize = 11.sp, color = Color.Gray, softWrap = false)
+                            Text("${v.category.displayName} • ${effective.formatEuro()}", fontSize = 11.sp, color = Color.Gray, softWrap = false)
                         }
                     }
                 }
@@ -1800,6 +1877,7 @@ fun ManualVisitDialog(
                     }
                 }
 
+                val currentSelectedEffective = PriceSyncManager.getCustomPrice(context, selectedVenue.id, selectedVenue.normalTicketPrice)
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { input ->
@@ -1814,13 +1892,13 @@ fun ManualVisitDialog(
                     singleLine = true
                 )
 
-                if (selectedVenue.normalTicketPrice != (priceText.toDoubleOrNull() ?: 0.0)) {
+                if (currentSelectedEffective != (priceText.toDoubleOrNull() ?: 0.0)) {
                     Text(
-                        "Zurücksetzen auf Standard (${selectedVenue.normalTicketPrice.formatEuro()})",
+                        "Zurücksetzen auf Standard (${currentSelectedEffective.formatEuro()})",
                         fontSize = 11.sp,
                         color = GlacierBlue,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable { priceText = String.format(Locale.US, "%.2f", selectedVenue.normalTicketPrice) }.padding(top = 4.dp)
+                        modifier = Modifier.clickable { priceText = String.format(Locale.US, "%.2f", currentSelectedEffective) }.padding(top = 4.dp)
                     )
                 }
 
@@ -1842,7 +1920,8 @@ fun ManualVisitDialog(
                     if (alreadyBooked && !showDuplicateWarning) {
                         showDuplicateWarning = true
                     } else {
-                        val finalAmount = priceText.toDoubleOrNull() ?: selectedVenue.normalTicketPrice
+                        val currentEffective = PriceSyncManager.getCustomPrice(context, selectedVenue.id, selectedVenue.normalTicketPrice)
+                        val finalAmount = priceText.toDoubleOrNull() ?: currentEffective
                         onConfirm(selectedVenue, selectedDate, finalAmount, notes)
                     }
                 },
@@ -1917,6 +1996,7 @@ fun EditVisitDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Besuchsdatum", fontSize = 11.sp, color = Color.Gray)
                             Text(editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                            Text("Zugeordnete Saison: ${getSeasonForDate(editedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
                         }
                         Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
@@ -1980,9 +2060,11 @@ fun EditVisitDialog(
 @Composable
 fun TarifSelectionDialog(
     currentConfig: TicketConfig,
+    viewModel: TrackerViewModel,
     onDismiss: () -> Unit,
     onSave: (TicketConfig) -> Unit
 ) {
+    val context = LocalContext.current
     var isEarlyBird by remember { mutableStateOf(currentConfig.isEarlyBird) }
     var selectedCategory by remember { mutableStateOf(currentConfig.category) }
 
@@ -1991,6 +2073,20 @@ fun TarifSelectionDialog(
         title = { Text("Ticket-Tarif anpassen", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = AlpineDark) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.manualPriceSync { success, msg ->
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Partnertarife jetzt online abgleichen", fontSize = 12.sp)
+                }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -2007,20 +2103,6 @@ fun TarifSelectionDialog(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        viewModel.manualPriceSync { success, msg ->
-                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Partnertarife jetzt online abgleichen", fontSize = 12.sp)
-                }
 
                 for (category in TarifCategory.entries) {
                     val price = if (isEarlyBird) category.earlyBirdPrice else category.normalPrice
