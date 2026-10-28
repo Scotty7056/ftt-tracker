@@ -12,7 +12,7 @@ class TrackerRepository(
     val ticketConfigFlow: Flow<TicketConfig> = ticketConfigDao.getConfig().map { entity ->
         if (entity != null) {
             TicketConfig(
-                category = try { TarifCategory.valueOf(entity.category) } catch (_: Exception) { TarifCategory.ADULT },
+                category = try { TarifCategory.valueOf(entity.categoryName) } catch (_: Exception) { TarifCategory.ADULT },
                 isEarlyBird = entity.isEarlyBird
             )
         } else {
@@ -36,7 +36,7 @@ class TrackerRepository(
         ticketConfigDao.saveConfig(
             TicketConfigEntity(
                 id = 1,
-                category = config.category.name,
+                categoryName = config.category.name,
                 isEarlyBird = config.isEarlyBird
             )
         )
