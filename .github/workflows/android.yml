@@ -34,14 +34,21 @@ jobs:
         echo "$KEYSTORE_RAW" | base64 --decode > app/keystore.jks
         ls -la app/keystore.jks
 
-    - name: Build Release APK
+    - name: Build Release Bundle & APK
       env:
         KEYSTORE_PASSWORD: "meinpasswort123"
         KEY_ALIAS: "fttkey"
         KEY_PASSWORD: "meinpasswort123"
-      run: ./gradlew assembleRelease -PappVersionCode=${{ github.run_number }} --stacktrace
+      run: ./gradlew bundleRelease assembleRelease -PappVersionCode=${{ github.run_number }} --stacktrace
 
-    - name: Upload Signed APK Artifact
+    - name: Upload Play Store Bundle (.aab)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ftt-tracker-playstore-bundle
+        path: app/build/outputs/bundle/release/*.aab
+        retention-days: 14
+
+    - name: Upload Signed APK (.apk)
       uses: actions/upload-artifact@v4
       with:
         name: ftt-tracker-signed-release
