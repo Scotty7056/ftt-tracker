@@ -15,7 +15,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.freizeittickettracker"
+        applicationId = "de.schott.ftttracker"
         minSdk = 26
         targetSdk = 35
         versionCode = computedVersionCode
