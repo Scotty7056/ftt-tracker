@@ -380,9 +380,9 @@ fun MainScreen(
             AlertDialog(
                 onDismissRequest = { showBackgroundRationaleDialog = false },
                 icon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(36.dp)) },
-                title = { Text("Automatische Erkennung mit Verweildauer", fontWeight = FontWeight.Bold, color = AlpineDark) },
+                title = { Text("Standorterfassung im Hintergrund", fontWeight = FontWeight.Bold, color = AlpineDark) },
                 text = {
-                    Text("Damit dich die App nach 15 Minuten Verweildauer an einer Talstation an das Einbuchen erinnern kann, wähle bitte 'Immer zulassen'. Reine Durchfahrten auf der Autobahn lösen keinen Alarm aus.")
+                    Text("FTT Tracker erfasst deinen Standort auch dann, wenn die App geschlossen ist oder nicht aktiv genutzt wird, um automatische Besuche an teilnehmenden Bergbahnen und Partnergebieten nach ca. 15 Minuten Verweildauer zu erkennen.\n\nDeine Standortdaten werden ausschließlich lokal auf deinem Gerät verarbeitet und niemals weitergegeben.")
                 },
                 confirmButton = {
                     Button(
@@ -394,224 +394,14 @@ fun MainScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
                     ) {
-                        Text("Weiter zu 'Immer zulassen'")
+                        Text("Verstanden & Weiter")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showBackgroundRationaleDialog = false }) { Text("Später", color = Color.Gray) }
+                    TextButton(onClick = { showBackgroundRationaleDialog = false }) { Text("Nicht jetzt", color = Color.Gray) }
                 }
             )
         }
-
-        visitPendingEdit?.let { visit ->
-            EditVisitDialog(
-                visit = visit,
-                onDismiss = { visitPendingEdit = null },
-                onSave = { updatedDate, updatedAmount, updatedNotes ->
-                    viewModel.updateVisit(visit.copy(date = updatedDate, savedAmount = updatedAmount, notes = updatedNotes))
-                    visitPendingEdit = null
-                }
-            )
-        }
-
-        visitPendingDeletion?.let { visit ->
-            AlertDialog(
-                onDismissRequest = { visitPendingDeletion = null },
-                icon = { Icon(Icons.Rounded.DeleteForever, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(36.dp)) },
-                title = { Text("Eintrag löschen?", fontWeight = FontWeight.Bold, color = AlpineDark) },
-                text = { Text("Möchtest du '${visit.venueName}' vom ${visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))} (+${visit.savedAmount.formatEuro()}) wirklich entfernen?") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.deleteVisit(visit)
-                            visitPendingDeletion = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = CoralWarning)
-                    ) {
-                        Text("Löschen", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { visitPendingDeletion = null }) { Text("Abbrechen", color = AlpineNavy) }
-                }
-            )
-        }
-    }
-}
-
-// ==========================================
-// 1. DASHBOARD
-// ==========================================
-@Composable
-fun DashboardView(
-    viewModel: TrackerViewModel,
-    onOpenTarifDialog: () -> Unit,
-    onRequestEditVisit: (VisitEntity) -> Unit,
-    onRequestDeleteVisit: (VisitEntity) -> Unit
-) {
-    val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
-    val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
-    val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
-    var showAddVisitDialog by remember { mutableStateOf(false) }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp)
-    ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(
-                            Brush.linearGradient(
-                                colors = if (stats.isAmortized) listOf(Color(0xFF0F3E2E), EmeraldGain)
-                                else listOf(AlpineDark, AlpineNavy, GlacierBlue)
-                            )
-                        )
-                        .padding(20.dp)
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "SAISON ${stats.season} • ${stats.tarifTitle.uppercase(Locale.GERMAN)}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    letterSpacing = 1.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "Kaufpreis: ${stats.purchasePrice.formatEuro()}",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
-                                    softWrap = false
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(
-                                onClick = onOpenTarifDialog,
-                                modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).size(36.dp)
-                            ) {
-                                Icon(Icons.Rounded.Edit, contentDescription = "Bearbeiten", tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("EINGEFAHRENER WERT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.75f), letterSpacing = 1.sp)
-                                Text(stats.totalValueSaved.formatEuro(), fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White, softWrap = false)
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (stats.isAmortized) EmeraldGain else Color.White.copy(alpha = 0.2f)
-                            ) {
-                                Text(
-                                    "${(stats.amortizationProgress * 100).toInt()}%",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        LinearProgressIndicator(
-                            progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                            color = if (stats.isAmortized) EmeraldGain else FrostTeal,
-                            trackColor = Color.White.copy(alpha = 0.25f)
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(
-                                if (stats.isAmortized) "🎉 Ticket amortisiert!" else "Noch offen zum Break-Even:",
-                                fontSize = 13.sp,
-                                color = Color.White.copy(alpha = 0.85f),
-                                modifier = Modifier.weight(1f)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                if (stats.isAmortized) "+${stats.netSavings.formatEuro()} Plus" else stats.remainingToAmortize.formatEuro(),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = if (stats.isAmortized) EmeraldGain else Color(0xFFFFD166),
-                                softWrap = false
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricTile("Ausflüge (${stats.season})", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
-                val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
-                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
-            }
-        }
-
-        item {
-            Button(
-                onClick = { showAddVisitDialog = true },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
-            ) {
-                Icon(Icons.Rounded.AddLocationAlt, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Besuch manuell eintragen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Aktivitäten Saison ${stats.season}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
-                if (visits.isNotEmpty()) Text("✏️ Ändern • 🗑️ Löschen", fontSize = 12.sp, color = Color.Gray)
-            }
-        }
-
-        if (visits.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    Column(modifier = Modifier.padding(28.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.Hiking, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(48.dp))
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("Keine Ausflüge in Saison ${stats.season}", fontWeight = FontWeight.SemiBold, color = Color.Gray)
-                    }
-                }
-            }
-        } else {
-            items(visits) { visit ->
-                ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
-            }
         }
 
         item {
