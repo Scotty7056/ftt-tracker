@@ -5,6 +5,7 @@ import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -21,22 +22,6 @@ fun getSeasonForDate(date: LocalDate): String {
 class TrackerViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: TrackerRepository
 
-        init {
-        val db = AppDatabase.getDatabase(application)
-        repository = TrackerRepository(db.visitDao(), db.ticketConfigDao())
-
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val allList = db.visitDao().getAllVisitsList()
-            for (v in allList) {
-                val correctSeason = getSeasonForDate(v.date)
-                if (v.season != correctSeason) {
-                    db.visitDao().updateVisit(v.copy(season = correctSeason))
-                }
-            }
-        }
-    } }
-    }
-
     private val _currentLocation = MutableStateFlow<Location?>(null)
     val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
 
@@ -44,6 +29,23 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     private val _selectedSeason = MutableStateFlow(getSeasonForDate(LocalDate.now()))
     val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
+
+    init {
+        val db = AppDatabase.getDatabase(application)
+        repository = TrackerRepository(db.visitDao(), db.ticketConfigDao())
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val allList = db.visitDao().getAllVisitsList()
+                for (v in allList) {
+                    val correctSeason = getSeasonForDate(v.date)
+                    if (v.season != correctSeason) {
+                        db.visitDao().updateVisit(v.copy(season = correctSeason))
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     val ticketConfig: Flow<TicketConfig> = repository.ticketConfigFlow
 
@@ -64,7 +66,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     val seasonVisits: Flow<List<VisitEntity>> = combine(repository.allVisits, _selectedSeason) { visits, season ->
         visits.filter { it.season == season || getSeasonForDate(it.date) == season }.sortedByDescending { it.date }
-        visits.filter { it.season == season }.sortedByDescending { it.date }
     }
 
     val dashboardStats: Flow<DashboardStats> = combine(seasonVisits, ticketConfig, _selectedSeason) { visits, config, season ->
