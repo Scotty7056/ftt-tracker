@@ -237,7 +237,7 @@ fun MainScreen(
                         modifier = Modifier.fillMaxWidth().padding(end = 8.dp)
                     ) {
                         Text(
-                            "â›·ï¸ FTT Tracker",
+                            "⛷️ FTT Tracker",
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 17.sp,
@@ -356,7 +356,7 @@ fun MainScreen(
                     viewModel.recordVisit(venue, chosenDate, note, customPrice)
                     Toast.makeText(
                         context,
-                        "âœ… ${venue.name} (${chosenDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}) eingebucht!",
+                        "✅ ${venue.name} (${chosenDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}) eingebucht!",
                         Toast.LENGTH_SHORT
                     ).show()
                     selectedDetailVenue = null
@@ -382,7 +382,7 @@ fun MainScreen(
                 icon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(36.dp)) },
                 title = { Text("Standorterfassung im Hintergrund", fontWeight = FontWeight.Bold, color = AlpineDark) },
                 text = {
-                    Text("FTT Tracker erfasst deinen Standort auch dann, wenn die App geschlossen ist oder nicht aktiv genutzt wird, um automatische Besuche an teilnehmenden Bergbahnen und Partnergebieten nach ca. 15 Minuten Verweildauer zu erkennen.\n\nDeine Standortdaten werden ausschlieÃŸlich lokal auf deinem GerÃ¤t verarbeitet und niemals weitergegeben.")
+                    Text("FTT Tracker erfasst deinen Standort auch dann, wenn die App geschlossen ist oder nicht aktiv genutzt wird, um automatische Besuche an teilnehmenden Bergbahnen und Partnergebieten nach ca. 15 Minuten Verweildauer zu erkennen.\n\nDeine Standortdaten werden ausschließlich lokal auf deinem Gerät verarbeitet und niemals weitergegeben.")
                 },
                 confirmButton = {
                     Button(
@@ -401,6 +401,217 @@ fun MainScreen(
                     TextButton(onClick = { showBackgroundRationaleDialog = false }) { Text("Nicht jetzt", color = Color.Gray) }
                 }
             )
+        }
+
+        visitPendingEdit?.let { visit ->
+            EditVisitDialog(
+                visit = visit,
+                onDismiss = { visitPendingEdit = null },
+                onSave = { updatedDate, updatedAmount, updatedNotes ->
+                    viewModel.updateVisit(visit.copy(date = updatedDate, savedAmount = updatedAmount, notes = updatedNotes))
+                    visitPendingEdit = null
+                }
+            )
+        }
+
+        visitPendingDeletion?.let { visit ->
+            AlertDialog(
+                onDismissRequest = { visitPendingDeletion = null },
+                icon = { Icon(Icons.Rounded.DeleteForever, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(36.dp)) },
+                title = { Text("Eintrag löschen?", fontWeight = FontWeight.Bold, color = AlpineDark) },
+                text = { Text("Möchtest du '${visit.venueName}' vom ${visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))} (+${visit.savedAmount.formatEuro()}) wirklich entfernen?") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.deleteVisit(visit)
+                            visitPendingDeletion = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CoralWarning)
+                    ) {
+                        Text("Löschen", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { visitPendingDeletion = null }) { Text("Abbrechen", color = AlpineNavy) }
+                }
+            )
+        }
+    }
+}
+
+// ==========================================
+// 1. DASHBOARD
+// ==========================================
+@Composable
+fun DashboardView(
+    viewModel: TrackerViewModel,
+    onOpenTarifDialog: () -> Unit,
+    onRequestEditVisit: (VisitEntity) -> Unit,
+    onRequestDeleteVisit: (VisitEntity) -> Unit
+) {
+    val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
+    val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
+    val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
+    var showAddVisitDialog by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(vertical = 16.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(
+                            Brush.linearGradient(
+                                colors = if (stats.isAmortized) listOf(Color(0xFF0F3E2E), EmeraldGain)
+                                else listOf(AlpineDark, AlpineNavy, GlacierBlue)
+                            )
+                        )
+                        .padding(20.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "SAISON ${stats.season} • ${stats.tarifTitle.uppercase(Locale.GERMAN)}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    letterSpacing = 1.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "Kaufpreis: ${stats.purchasePrice.formatEuro()}",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    softWrap = false
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = onOpenTarifDialog,
+                                modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).size(36.dp)
+                            ) {
+                                Icon(Icons.Rounded.Edit, contentDescription = "Bearbeiten", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("EINGEFAHRENER WERT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.75f), letterSpacing = 1.sp)
+                                Text(stats.totalValueSaved.formatEuro(), fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White, softWrap = false)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (stats.isAmortized) EmeraldGain else Color.White.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    "${(stats.amortizationProgress * 100).toInt()}%",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        LinearProgressIndicator(
+                            progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                            color = if (stats.isAmortized) EmeraldGain else FrostTeal,
+                            trackColor = Color.White.copy(alpha = 0.25f)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                if (stats.isAmortized) "🎉 Ticket amortisiert!" else "Noch offen zum Break-Even:",
+                                fontSize = 13.sp,
+                                color = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                if (stats.isAmortized) "+${stats.netSavings.formatEuro()} Plus" else stats.remainingToAmortize.formatEuro(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = if (stats.isAmortized) EmeraldGain else Color(0xFFFFD166),
+                                softWrap = false
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile("Ausflüge (${stats.season})", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
+                val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
+                MetricTile("Ø Ersparnis/Tag", avg.formatEuro(), Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
+            }
+        }
+
+        item {
+            Button(
+                onClick = { showAddVisitDialog = true },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+            ) {
+                Icon(Icons.Rounded.AddLocationAlt, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Besuch manuell eintragen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Aktivitäten Saison ${stats.season}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                if (visits.isNotEmpty()) Text("✏️ Ändern • 🗑️ Löschen", fontSize = 12.sp, color = Color.Gray)
+            }
+        }
+
+        if (visits.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(modifier = Modifier.padding(28.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Rounded.Hiking, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("Keine Ausflüge in Saison ${stats.season}", fontWeight = FontWeight.SemiBold, color = Color.Gray)
+                    }
+                }
+            }
+        } else {
+            items(visits) { visit ->
+                ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
+            }
         }
 
         item {
@@ -423,18 +634,18 @@ fun MainScreen(
                 textAlign = TextAlign.Center
             )
         }
+    }
 
-        if (showAddVisitDialog) {
-            ManualVisitDialog(
-                venues = VenueCatalog.venues,
-                existingVisits = allVisits,
-                onDismiss = { showAddVisitDialog = false },
-                onConfirm = { venue, date, amount, notes ->
-                    viewModel.recordVisit(venue, date, notes, amount)
-                    showAddVisitDialog = false
-                }
-            )
-        }
+    if (showAddVisitDialog) {
+        ManualVisitDialog(
+            venues = VenueCatalog.venues,
+            existingVisits = allVisits,
+            onDismiss = { showAddVisitDialog = false },
+            onConfirm = { venue, date, amount, notes ->
+                viewModel.recordVisit(venue, date, notes, amount)
+                showAddVisitDialog = false
+            }
+        )
     }
 }
 
@@ -456,7 +667,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     val text = stream.bufferedReader().readText()
                     viewModel.importVisitsFromCsv(text) { count ->
-                        Toast.makeText(context, "âœ… $count EintrÃ¤ge erfolgreich importiert!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "✅ $count Einträge erfolgreich importiert!", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
@@ -505,15 +716,15 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("FTT WRAPPED", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GlacierBlue, letterSpacing = 1.sp)
-                            Text("Saison-RÃ¼ckblick ${stats.season}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                            Text("Saison-Rückblick ${stats.season}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                         }
                         IconButton(
                             onClick = {
-                                val shareText = "â›·ï¸ Mein FTT Saison-RÃ¼ckblick ${stats.season}:\n" +
-                                        "â€¢ ${stats.totalVisits} AusflÃ¼ge absolviert\n" +
-                                        "â€¢ ${stats.totalValueSaved.formatEuro()} Wert eingefahren\n" +
-                                        (if (stats.isAmortized) "â€¢ ðŸŽ‰ Amortisiert mit +${stats.netSavings.formatEuro()} Reingewinn!\n" else "â€¢ ${stats.remainingToAmortize.formatEuro()} noch bis zum Break-Even\n") +
-                                        "Getrackt mit dem FTT Tracker fÃ¼r Android."
+                                val shareText = "⛷️ Mein FTT Saison-Rückblick ${stats.season}:\n" +
+                                        "• ${stats.totalVisits} Ausflüge absolviert\n" +
+                                        "• ${stats.totalValueSaved.formatEuro()} Wert eingefahren\n" +
+                                        (if (stats.isAmortized) "• 🎉 Amortisiert mit +${stats.netSavings.formatEuro()} Reingewinn!\n" else "• ${stats.remainingToAmortize.formatEuro()} noch bis zum Break-Even\n") +
+                                        "Getrackt mit dem FTT Tracker für Android."
                                 val sendIntent = Intent().apply {
                                     action = Intent.ACTION_SEND
                                     putExtra(Intent.EXTRA_TEXT, shareText)
@@ -531,7 +742,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Rechnerischer Preis pro Skitag:", fontSize = 13.sp, color = Color.Gray)
-                        Text(if (costPerSkiDay > 0) costPerSkiDay.formatEuro() else "â€“", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                        Text(if (costPerSkiDay > 0) costPerSkiDay.formatEuro() else "–", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
                     }
                 }
             }
@@ -549,7 +760,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (categoryStats.isEmpty()) {
-                        Text("Noch keine Daten fÃ¼r diese Saison.", fontSize = 13.sp, color = Color.Gray)
+                        Text("Noch keine Daten für diese Saison.", fontSize = 13.sp, color = Color.Gray)
                     } else {
                         categoryStats.forEach { stat ->
                             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -654,7 +865,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             onClick = {
                                 coroutineScope.launch {
                                     AutoBackupManager.performAutoBackup(context, visits)
-                                    Toast.makeText(context, "âœ… Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "✅ Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
@@ -711,7 +922,7 @@ fun CalendarView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "ZurÃ¼ck")
+                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Zurück")
                     }
                     Text(
                         text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)),
@@ -773,7 +984,7 @@ fun CalendarView(
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "AusflÃ¼ge am ${selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN))}",
+            "Ausflüge am ${selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN))}",
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             color = AlpineDark
@@ -817,7 +1028,7 @@ fun OsmMapOverviewView(
             256,
             ".png",
             arrayOf("https://a.tile.opentopomap.org/", "https://b.tile.opentopomap.org/", "https://c.tile.opentopomap.org/"),
-            "Kartendaten: Â© OpenStreetMap-Mitwirkende, SRTM | Darstellung: Â© OpenTopoMap (CC-BY-SA)"
+            "Kartendaten: © OpenStreetMap-Mitwirkende, SRTM | Darstellung: © OpenTopoMap (CC-BY-SA)"
         )
     }
 
@@ -861,17 +1072,17 @@ fun OsmMapOverviewView(
                 val isVisited = visitedVenueIdsToday.contains(v.id)
                 val currentPrice = PriceSyncManager.getCustomPrice(context, v.id, v.normalTicketPrice)
                 val (pinColor, emoji) = when (v.category) {
-                    VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "â›·ï¸"
-                    VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "ðŸ›·"
-                    VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to "â›¸ï¸"
-                    VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "ðŸŠ"
-                    VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "ðŸ›ï¸"
+                    VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
+                    VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "🛷"
+                    VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to "⛸️"
+                    VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "🏊"
+                    VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "🏛️"
                 }
                 m.icon = createOsmMarkerDrawable(context, emoji, pinColor, isVisited)
                 m.snippet = if (isVisited) {
-                    "${v.category.displayName} â€¢ ${currentPrice.formatEuro()}\nâœ… Heute bereits erfasst"
+                    "${v.category.displayName} • ${currentPrice.formatEuro()}\n✅ Heute bereits erfasst"
                 } else {
-                    "${v.category.displayName} â€¢ ${currentPrice.formatEuro()}\nðŸ‘‰ Pin oder Text gedrÃ¼ckt halten zum Einbuchen"
+                    "${v.category.displayName} • ${currentPrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
                 }
             }
         }
@@ -904,7 +1115,7 @@ fun OsmMapOverviewView(
                                     if (isAlreadyDone) {
                                         Toast.makeText(
                                             context,
-                                            "âš ï¸ ${venue.name} wurde heute bereits verbucht!",
+                                            "⚠️ ${venue.name} wurde heute bereits verbucht!",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                         return true
@@ -919,7 +1130,7 @@ fun OsmMapOverviewView(
                                     )
                                     Toast.makeText(
                                         context,
-                                        "âš¡ ${venue.name} (+${effectivePrice.formatEuro()}) direkt eingebucht!",
+                                        "⚡ ${venue.name} (+${effectivePrice.formatEuro()}) direkt eingebucht!",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                     closeInfoWindow()
@@ -932,17 +1143,17 @@ fun OsmMapOverviewView(
                         marker.position = GeoPoint(venue.latitude, venue.longitude)
                         marker.title = venue.name
                         marker.snippet = if (isVisited) {
-                            "${venue.category.displayName} â€¢ ${effectivePrice.formatEuro()}\nâœ… Heute bereits erfasst"
+                            "${venue.category.displayName} • ${effectivePrice.formatEuro()}\n✅ Heute bereits erfasst"
                         } else {
-                            "${venue.category.displayName} â€¢ ${effectivePrice.formatEuro()}\nðŸ‘‰ Pin oder Text gedrÃ¼ckt halten zum Einbuchen"
+                            "${venue.category.displayName} • ${effectivePrice.formatEuro()}\n👉 Pin oder Text gedrückt halten zum Einbuchen"
                         }
 
                         val (pinColor, emoji) = when (venue.category) {
-                            VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "â›·ï¸"
-                            VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "ðŸ›·"
-                            VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to "â›¸ï¸"
-                            VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "ðŸŠ"
-                            VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "ðŸ›ï¸"
+                            VenueCategory.SKI -> android.graphics.Color.parseColor("#0077B6") to "⛷️"
+                            VenueCategory.SLED -> android.graphics.Color.parseColor("#E65100") to "🛷"
+                            VenueCategory.ICE -> android.graphics.Color.parseColor("#7B1FA2") to "⛸️"
+                            VenueCategory.POOL -> android.graphics.Color.parseColor("#00838F") to "🏊"
+                            VenueCategory.CULTURE -> android.graphics.Color.parseColor("#D84315") to "🏛️"
                         }
                         marker.icon = createOsmMarkerDrawable(context, emoji, pinColor, isVisited)
                         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -961,7 +1172,7 @@ fun OsmMapOverviewView(
                                     if (isAlreadyDone) {
                                         Toast.makeText(
                                             context,
-                                            "âš ï¸ ${venue.name} wurde heute bereits verbucht!",
+                                            "⚠️ ${venue.name} wurde heute bereits verbucht!",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     } else {
@@ -974,7 +1185,7 @@ fun OsmMapOverviewView(
                                         )
                                         Toast.makeText(
                                             context,
-                                            "âœ… ${venue.name} (+${effectivePrice.formatEuro()}) eingebucht!",
+                                            "✅ ${venue.name} (+${effectivePrice.formatEuro()}) eingebucht!",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                         close()
@@ -1121,7 +1332,7 @@ fun PartnerListView(
                                 Text(venue.subtitle, fontSize = 11.sp, color = Color.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("RegulÃ¤rer Tarif: ${effectivePrice.formatEuro()}", fontSize = 12.sp, color = Color.Gray, softWrap = false)
+                            Text("Regulärer Tarif: ${effectivePrice.formatEuro()}", fontSize = 12.sp, color = Color.Gray, softWrap = false)
                         }
                         userLocation?.let { loc ->
                             Spacer(modifier = Modifier.width(8.dp))
@@ -1211,17 +1422,17 @@ fun VenueDetailBottomSheet(
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Status", color = Color.Gray, fontSize = 13.sp)
-                        Text("â— RegulÃ¤rer Betrieb", color = EmeraldGain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("● Regulärer Betrieb", color = EmeraldGain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Ã–ffnungszeiten", color = Color.Gray, fontSize = 13.sp)
-                        Text("08:30 â€“ 16:30 Uhr", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Öffnungszeiten", color = Color.Gray, fontSize = 13.sp)
+                        Text("08:30 – 16:30 Uhr", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(if (venue.category == VenueCategory.SKI) "Schneelage (Berg/Tal)" else "Bedingungen", color = Color.Gray, fontSize = 13.sp)
-                        Text(if (venue.category == VenueCategory.SKI) "125 cm / 40 cm" else "Sehr gut prÃ¤pariert", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text(if (venue.category == VenueCategory.SKI) "125 cm / 40 cm" else "Sehr gut präpariert", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1244,17 +1455,17 @@ fun VenueDetailBottomSheet(
                     val w = weatherData!!
                     Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${"%.1f".format(w.temperature_2m)} Â°C", fontSize = 24.sp, fontWeight = FontWeight.Black, color = AlpineDark)
-                            Text("GefÃ¼hlt ${"%.1f".format(w.apparent_temperature)} Â°C", fontSize = 11.sp, color = Color.Gray)
+                            Text("${"%.1f".format(w.temperature_2m)} °C", fontSize = 24.sp, fontWeight = FontWeight.Black, color = AlpineDark)
+                            Text("Gefühlt ${"%.1f".format(w.apparent_temperature)} °C", fontSize = 11.sp, color = Color.Gray)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             val condition = when (w.weather_code) {
-                                0 -> "â˜€ï¸ Klar"
-                                1, 2, 3 -> "â›… Leicht bewÃ¶lkt"
-                                45, 48 -> "ðŸŒ«ï¸ Nebel"
-                                51, 53, 55, 61, 63, 65 -> "ðŸŒ§ï¸ Regen"
-                                71, 73, 75, 77, 85, 86 -> "â„ï¸ Schneefall"
-                                else -> "â˜ï¸ Bedeckt"
+                                0 -> "☀️ Klar"
+                                1, 2, 3 -> "⛅ Leicht bewölkt"
+                                45, 48 -> "🌫️ Nebel"
+                                51, 53, 55, 61, 63, 65 -> "🌧️ Regen"
+                                71, 73, 75, 77, 85, 86 -> "❄️ Schneefall"
+                                else -> "☁️ Bedeckt"
                             }
                             Text(condition, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GlacierBlue)
                             Text("Wind: ${"%.0f".format(w.wind_speed_10m)} km/h", fontSize = 11.sp, color = Color.Gray)
@@ -1273,7 +1484,7 @@ fun VenueDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            Text("Besuchsdatum wÃ¤hlen", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+            Text("Besuchsdatum wählen", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedCard(
@@ -1317,7 +1528,7 @@ fun VenueDetailBottomSheet(
                         )
                     }
                     TextButton(onClick = { showDatePicker = true }) {
-                        Text("Datum Ã¤ndern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                        Text("Datum ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1332,15 +1543,15 @@ fun VenueDetailBottomSheet(
                         priceText = sanitized
                     }
                 },
-                label = { Text("Angerechneter Tarif (â‚¬)") },
-                trailingIcon = { Text("â‚¬", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                label = { Text("Angerechneter Tarif (€)") },
+                trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
 
             if (effectivePrice != (priceText.toDoubleOrNull() ?: 0.0)) {
                 Text(
-                    text = "ZurÃ¼cksetzen auf Standardtarif (${effectivePrice.formatEuro()})",
+                    text = "Zurücksetzen auf Standardtarif (${effectivePrice.formatEuro()})",
                     fontSize = 11.sp,
                     color = GlacierBlue,
                     fontWeight = FontWeight.SemiBold,
@@ -1402,7 +1613,7 @@ fun VenueDetailBottomSheet(
                             showDuplicateWarning = true
                         } else {
                             val finalPrice = priceText.toDoubleOrNull() ?: effectivePrice
-                            val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Ãœber Partneransicht erfasst"
+                            val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Über Partneransicht erfasst"
                             onBookVisit(selectedDate, finalPrice, finalNote)
                         }
                     },
@@ -1438,7 +1649,7 @@ fun VenueDetailBottomSheet(
                             showDuplicateWarning = false
                         }
                         showDatePicker = false
-                    }) { Text("Ãœbernehmen") }
+                    }) { Text("Übernehmen") }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
@@ -1461,11 +1672,11 @@ fun CategoryBadge(
     cornerRadius: Dp = 8.dp
 ) {
     val (emoji, bg) = when (category) {
-        VenueCategory.SKI -> "â›·ï¸" to Color(0xFFE0F2FE)
-        VenueCategory.SLED -> "ðŸ›·" to Color(0xFFFFE0B2)
-        VenueCategory.ICE -> "â›¸ï¸" to Color(0xFFEDE7F6)
-        VenueCategory.POOL -> "ðŸŠ" to Color(0xFFE0F7FA)
-        VenueCategory.CULTURE -> "ðŸ›ï¸" to Color(0xFFFBE9E7)
+        VenueCategory.SKI -> "⛷️" to Color(0xFFE0F2FE)
+        VenueCategory.SLED -> "🛷" to Color(0xFFFFE0B2)
+        VenueCategory.ICE -> "⛸️" to Color(0xFFEDE7F6)
+        VenueCategory.POOL -> "🏊" to Color(0xFFE0F7FA)
+        VenueCategory.CULTURE -> "🏛️" to Color(0xFFFBE9E7)
     }
     Surface(shape = RoundedCornerShape(cornerRadius), color = bg, modifier = Modifier.size(size)) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -1501,7 +1712,7 @@ fun ModernVisitCard(visit: VisitEntity, onEdit: () -> Unit, onDelete: () -> Unit
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(visit.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), fontSize = 12.sp, color = Color.Gray, softWrap = false)
                     if (visit.notes.isNotEmpty()) {
-                        Text(" â€¢ ${visit.notes}", fontSize = 12.sp, color = GlacierBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(" • ${visit.notes}", fontSize = 12.sp, color = GlacierBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -1516,7 +1727,7 @@ fun ModernVisitCard(visit: VisitEntity, onEdit: () -> Unit, onDelete: () -> Unit
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp).clip(CircleShape).background(CoralWarning.copy(alpha = 0.10f))) {
-                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "LÃ¶schen", tint = CoralWarning, modifier = Modifier.size(17.dp))
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "Löschen", tint = CoralWarning, modifier = Modifier.size(17.dp))
                 }
             }
         }
@@ -1587,7 +1798,7 @@ fun ManualVisitDialog(
                         showDuplicateWarning = false
                     }
                     showDatePicker = false
-                }) { Text("Ãœbernehmen") }
+                }) { Text("Übernehmen") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
@@ -1614,7 +1825,7 @@ fun ManualVisitDialog(
                             Text(selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                             Text("Zugeordnete Saison: ${getSeasonForDate(selectedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
                         }
-                        Text("Ã„ndern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                        Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -1623,7 +1834,7 @@ fun ManualVisitDialog(
                 OutlinedTextField(
                     value = filterText,
                     onValueChange = { filterText = it },
-                    placeholder = { Text("Gebiet oder AktivitÃ¤t suchen...", fontSize = 13.sp) },
+                    placeholder = { Text("Gebiet oder Aktivität suchen...", fontSize = 13.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1639,7 +1850,7 @@ fun ManualVisitDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(v.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${v.category.displayName} â€¢ ${effective.formatEuro()}", fontSize = 11.sp, color = Color.Gray, softWrap = false)
+                            Text("${v.category.displayName} • ${effective.formatEuro()}", fontSize = 11.sp, color = Color.Gray, softWrap = false)
                         }
                     }
                 }
@@ -1657,7 +1868,7 @@ fun ManualVisitDialog(
                             Icon(Icons.Rounded.Warning, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Hinweis: Dieses Ziel wurde am gewÃ¤hlten Tag bereits gebucht!",
+                                "Hinweis: Dieses Ziel wurde am gewählten Tag bereits gebucht!",
                                 color = CoralWarning,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -1675,15 +1886,15 @@ fun ManualVisitDialog(
                             priceText = sanitized
                         }
                     },
-                    label = { Text("GÃ¼ltiger Tarif (â‚¬)") },
-                    trailingIcon = { Text("â‚¬", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                    label = { Text("Gültiger Tarif (€)") },
+                    trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
                 if (currentSelectedEffective != (priceText.toDoubleOrNull() ?: 0.0)) {
                     Text(
-                        "ZurÃ¼cksetzen auf Standard (${currentSelectedEffective.formatEuro()})",
+                        "Zurücksetzen auf Standard (${currentSelectedEffective.formatEuro()})",
                         fontSize = 11.sp,
                         color = GlacierBlue,
                         fontWeight = FontWeight.SemiBold,
@@ -1755,7 +1966,7 @@ fun EditVisitDialog(
                         editedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
                     }
                     showDatePicker = false
-                }) { Text("Ãœbernehmen") }
+                }) { Text("Übernehmen") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
@@ -1787,7 +1998,7 @@ fun EditVisitDialog(
                             Text(editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                             Text("Zugeordnete Saison: ${getSeasonForDate(editedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
                         }
-                        Text("Ã„ndern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                        Text("Ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -1801,8 +2012,8 @@ fun EditVisitDialog(
                             editedPriceText = sanitized
                         }
                     },
-                    label = { Text("Angerechneter Tarif (â‚¬)") },
-                    trailingIcon = { Text("â‚¬", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                    label = { Text("Angerechneter Tarif (€)") },
+                    trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1822,7 +2033,7 @@ fun EditVisitDialog(
                 OutlinedTextField(
                     value = editedNotes,
                     onValueChange = { editedNotes = it },
-                    label = { Text("Notiz / Grund fÃ¼r Preisabweichung") },
+                    label = { Text("Notiz / Grund für Preisabweichung") },
                     placeholder = { Text("z. B. Halbtageskarte, Vormittagstarif...") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -1886,7 +2097,7 @@ fun TarifSelectionDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("VergÃ¼nstigter Preis vor Saisonstart", fontSize = 11.sp, color = Color.Gray)
+                            Text("Vergünstigter Preis vor Saisonstart", fontSize = 11.sp, color = Color.Gray)
                         }
                     }
                 }
@@ -1976,7 +2187,7 @@ fun createOsmMarkerDrawable(context: Context, emoji: String, backgroundColor: In
             textAlign = Paint.Align.CENTER
         }
         val checkY = badgeY - ((checkTextPaint.descent() + checkTextPaint.ascent()) / 2f)
-        canvas.drawText("âœ“", badgeX, checkY, checkTextPaint)
+        canvas.drawText("✓", badgeX, checkY, checkTextPaint)
     }
 
     return BitmapDrawable(context.resources, bitmap)
