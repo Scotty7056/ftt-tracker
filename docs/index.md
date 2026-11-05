@@ -11,7 +11,7 @@ Der Schutz deiner persönlichen Daten ist uns ein wichtiges Anliegen. Die App **
 Verantwortlich für die Datenverarbeitung im Sinne der Datenschutz-Grundverordnung (DSGVO):
 
 **Thomas Schott**  
-GitHub: [https://github.com/th-schott/freizeitticket-tracker](https://github.com/Scotty7056/ftt-tracker)]
+GitHub: [https://github.com/Scotty7056/ftt-tracker](https://github.com/Scotty7056/ftt-tracker)]
 ---
 
 ## 2. Erhebung und Verarbeitung personenbezogener Daten
