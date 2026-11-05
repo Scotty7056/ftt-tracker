@@ -424,18 +424,18 @@ fun MainScreen(
                 textAlign = TextAlign.Center
             )
         }
-    }
 
-    if (showAddVisitDialog) {
-        ManualVisitDialog(
-            venues = VenueCatalog.venues,
-            existingVisits = allVisits,
-            onDismiss = { showAddVisitDialog = false },
-            onConfirm = { venue, date, amount, notes ->
-                viewModel.recordVisit(venue, date, notes, amount)
-                showAddVisitDialog = false
-            }
-        )
+        if (showAddVisitDialog) {
+            ManualVisitDialog(
+                venues = VenueCatalog.venues,
+                existingVisits = allVisits,
+                onDismiss = { showAddVisitDialog = false },
+                onConfirm = { venue, date, amount, notes ->
+                    viewModel.recordVisit(venue, date, notes, amount)
+                    showAddVisitDialog = false
+                }
+            )
+        }
     }
 }
 
