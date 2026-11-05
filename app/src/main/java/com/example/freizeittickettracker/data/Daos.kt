@@ -8,6 +8,9 @@ interface VisitDao {
     @Query("SELECT * FROM visits ORDER BY date DESC")
     fun getAllVisits(): Flow<List<VisitEntity>>
 
+    @Query("SELECT * FROM visits")
+    suspend fun getAllVisitsList(): List<VisitEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVisit(visit: VisitEntity)
 
