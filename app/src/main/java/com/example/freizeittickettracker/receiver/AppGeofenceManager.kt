@@ -30,8 +30,8 @@ class AppGeofenceManager(private val context: Context) {
                 .setCircularRegion(venue.latitude, venue.longitude, venue.geofenceRadiusMeters.toFloat())
                 .setExpirationDuration(Geofence.NEVER_EXPIRE)
                 // Smarte Entprellung: Benachrichtigung erst nach 15 Minuten Verweildauer
-                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_DWELL)
-                .setLoiteringDelay(900000) // 15 Min Verweildauer (verhindert Autobahn-Fehlalarme)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_DWELL or Geofence.GEOFENCE_TRANSITION_DWELL)
+                .setLoiteringDelay(120000) // 15 Min Verweildauer (verhindert Autobahn-Fehlalarme)
                 .build()
         }
 
