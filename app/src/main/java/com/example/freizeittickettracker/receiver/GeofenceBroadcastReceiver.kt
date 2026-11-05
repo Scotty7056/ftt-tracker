@@ -96,4 +96,16 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
 
         notificationManager.notify(venueId.hashCode(), notification)
     }
+
+    private fun wasAlreadyNotifiedToday(context: Context, venueId: String): Boolean {
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+        val todayStr = java.time.LocalDate.now().toString()
+        val key = "last_notified_${venueId}"
+        val lastDate = prefs.getString(key, null)
+        if (lastDate == todayStr) {
+            return true
+        }
+        prefs.edit().putString(key, todayStr).apply()
+        return false
+    }
 }
