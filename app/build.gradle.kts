@@ -12,12 +12,12 @@ val computedVersionName = if (project.hasProperty("appVersionCode")) "$baseVersi
 
 android {
     namespace = "com.example.freizeittickettracker"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "de.schott.ftttracker"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = computedVersionCode
         versionName = computedVersionName
 
