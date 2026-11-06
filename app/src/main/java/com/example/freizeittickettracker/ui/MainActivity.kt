@@ -570,15 +570,11 @@ fun DashboardView(
                     MetricTile("Aktivitäten", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
                     val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
                     val (rightTitle, rightValue) = if (stats.isAmortized) {
-                        val netProfit = stats.totalValueSaved - stats.ticketCost
-                        "Reingewinn" to "+${netProfit.formatEuro()}"
+                        "Reingewinn" to "+${stats.netSavings.formatEuro()}"
                     } else {
-                        val needed = if (avg > 0) kotlin.math.ceil((stats.ticketCost - stats.totalValueSaved) / avg).toInt() else 0
+                        val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
                         "Noch nötig" to "ca. ${needed}x"
                     }
-                    MetricTile(rightTitle, rightValue, Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
-                }
-            }
 
         item {
             Button(
