@@ -573,7 +573,7 @@ fun DashboardView(
                     "Reingewinn" to "+$"
                 } else {
                     val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
-                    "Noch nötig" to "ca. $x"
+                    "Noch nötig" to ("ca. " + needed + "x")
                 }
                 MetricTile(rightTitle, rightValue, Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
             }
