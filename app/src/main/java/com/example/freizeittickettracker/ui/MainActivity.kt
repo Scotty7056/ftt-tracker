@@ -566,15 +566,18 @@ fun DashboardView(
         }
 
         item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MetricTile("Aktivitäten", "${stats.totalVisits}", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
-                    val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
-                    val (rightTitle, rightValue) = if (stats.isAmortized) {
-                        "Reingewinn" to "+${stats.netSavings.formatEuro()}"
-                    } else {
-                        val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
-                        "Noch nötig" to "ca. ${needed}x"
-                    }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricTile("Aktivitäten", "$", Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
+                val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
+                val (rightTitle, rightValue) = if (stats.isAmortized) {
+                    "Reingewinn" to "+$"
+                } else {
+                    val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
+                    "Noch nötig" to "ca. $x"
+                }
+                MetricTile(rightTitle, rightValue, Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
+            }
+        }
 
         item {
             Button(
