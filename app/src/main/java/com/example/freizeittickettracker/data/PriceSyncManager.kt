@@ -54,7 +54,7 @@ object PriceSyncManager {
                 }
             }
 
-            val responseText = client.get(PRICE_URL).bodyAsText()
+            val responseText = client.get(PRICE_URL).body<String>()
             val jsonParser = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
             val payload = jsonParser.decodeFromString<PriceSyncPayload>(responseText)
             client.close()
