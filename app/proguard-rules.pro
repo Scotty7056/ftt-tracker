@@ -13,3 +13,10 @@
 # Jetpack Compose
 -keepattributes *Annotation*
 -dontwarn androidx.compose.**
+
+# Ktor & Desktop Java Runtime Workarounds
+-dontwarn java.lang.management.**
+-dontwarn javax.naming.**
+
+# SLF4J
+-dontwarn org.slf4j.**
