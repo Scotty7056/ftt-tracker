@@ -69,6 +69,23 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     private val prefs = application.getSharedPreferences("ftt_season_tarifs", android.content.Context.MODE_PRIVATE)
 
+        fun getHistoricalSeasonPrice(season: String, fallbackPrice: Double): Double {
+        val saved = prefs.getFloat("custom_price_" + season, -1f)
+        return if (saved >= 0f) saved.toDouble() else fallbackPrice
+    }
+
+    fun getHistoricalSeasonLabel(season: String, fallbackLabel: String): String {
+        return prefs.getString("custom_label_" + season, null) ?: fallbackLabel
+    }
+
+    fun saveHistoricalSeasonConfig(season: String, price: Double, label: String) {
+        prefs.edit()
+            .putFloat("custom_price_" + season, price.toFloat())
+            .putString("custom_label_" + season, label)
+            .apply()
+        _selectedSeason.value = season
+    }
+
     fun getTicketConfigForSeason(season: String, fallback: TicketConfig): TicketConfig {
         val catName = prefs.getString("tarif_cat_" + season, null)
         val isEarly = prefs.getBoolean("tarif_early_" + season, fallback.isEarlyBird)
@@ -81,9 +98,18 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     val dashboardStats: Flow<DashboardStats> = combine(seasonVisits, ticketConfig, _selectedSeason) { visits, baseConfig, season ->
+                val currentSeason = getSeasonForDate(LocalDate.now())
+        val isHistorical = season != currentSeason
         val config = getTicketConfigForSeason(season, baseConfig)
+        val defaultPrice = if (config.isEarlyBird) config.category.earlyBirdPrice else config.category.normalPrice
+        val purchasePrice = if (isHistorical) getHistoricalSeasonPrice(season, defaultPrice) else defaultPrice
+        val tarifLabel = if (isHistorical) {
+            getHistoricalSeasonLabel(season, config.category.label + (if (config.isEarlyBird) " (Vorverkauf)" else ""))
+        } else {
+            config.category.label + (if (config.isEarlyBird) " (Vorverkauf)" else "")
+        }
         val totalValue = visits.sumOf { it.savedAmount }
-        val purchasePrice = if (config.isEarlyBird) config.category.earlyBirdPrice else config.category.normalPrice
+        
         val remaining = (purchasePrice - totalValue).coerceAtLeast(0.0)
         val netSavings = (totalValue - purchasePrice).coerceAtLeast(0.0)
         val progress = if (purchasePrice > 0.0) (totalValue / purchasePrice).toFloat() else 0f
@@ -97,7 +123,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
             netSavings = netSavings,
             amortizationProgress = progress,
             isAmortized = totalValue >= purchasePrice,
-            tarifTitle = config.category.label + (if (config.isEarlyBird) " (Vorverkauf)" else "")
+            tarifTitle = tarifLabel
         )
     }
 

@@ -20,6 +20,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -575,7 +576,7 @@ fun DashboardView(
                     val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
                     "Noch nÃ¶tig" to ("ca. " + needed + "x")
                 }
-                MetricTile(rightTitle, rightValue, Icons.AutoMirrored.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
+                MetricTile(rightTitle, rightValue, Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
             }
         }
 
@@ -2072,7 +2073,8 @@ fun TarifSelectionDialog(
     onSave: (TicketConfig) -> Unit
 ) {
     val context = LocalContext.current
-    val isHistorical = season != getSeasonForDate(LocalDate.now())
+    val currentSeasonStr = getSeasonForDate(LocalDate.now())
+    val isHistorical = season != currentSeasonStr
     var isEarlyBird by remember { mutableStateOf(currentConfig.isEarlyBird) }
     var selectedCategory by remember { mutableStateOf(currentConfig.category) }
 
@@ -2093,7 +2095,7 @@ fun TarifSelectionDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                if (isHistorical) "Tarif Saison $season anpassen" else "Ticket-Tarif anpassen",
+                text = if (isHistorical) "Tarif Saison $season anpassen" else "Ticket-Tarif anpassen",
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 color = AlpineDark
@@ -2103,7 +2105,7 @@ fun TarifSelectionDialog(
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (isHistorical) {
                     Text(
-                        "Für vergangene Saisons gelten individuelle Ticketpreise. Gib hier deinen tatsächlichen damaligen Kaufpreis ein:",
+                        text = "Fuer vergangene Saisons gelten individuelle Ticketpreise. Gib hier deinen tatsaechlichen damaligen Kaufpreis ein:",
                         fontSize = 13.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -2155,7 +2157,7 @@ fun TarifSelectionDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-                                Text("Vergünstigter Preis vor Saisonstart", fontSize = 12.sp, color = Color.Gray)
+                                Text("Verguenstigter Preis vor Saisonstart", fontSize = 12.sp, color = Color.Gray)
                             }
                         }
                     }
