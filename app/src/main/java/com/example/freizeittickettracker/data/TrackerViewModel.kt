@@ -53,22 +53,35 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     val availableSeasons: StateFlow<List<String>> = repository.allVisits
         .map { visits ->
-            val fromVisits = visits.map { it.season }.distinct()
-            val currentYear = LocalDate.now().year
-            val defaultSeasons = (currentYear downTo currentYear - 3).map { "$it/${it + 1}" }
-            (defaultSeasons + fromVisits).distinct().sortedDescending()
+            val fromVisits = visits.map { it.season }.filter { it.isNotBlank() }.distinct()
+            val currentSeason = getSeasonForDate(LocalDate.now())
+            (listOf(currentSeason) + fromVisits).distinct().sortedDescending()
         }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            listOf("2026/2027", "2025/2026", "2024/2025", "2023/2024")
+            listOf(getSeasonForDate(LocalDate.now()))
         )
 
     val seasonVisits: Flow<List<VisitEntity>> = combine(repository.allVisits, _selectedSeason) { visits, season ->
         visits.filter { it.season == season || getSeasonForDate(it.date) == season }.sortedByDescending { it.date }
     }
 
-    val dashboardStats: Flow<DashboardStats> = combine(seasonVisits, ticketConfig, _selectedSeason) { visits, config, season ->
+    private val prefs = application.getSharedPreferences("ftt_season_tarifs", android.content.Context.MODE_PRIVATE)
+
+    fun getTicketConfigForSeason(season: String, fallback: TicketConfig): TicketConfig {
+        val catName = prefs.getString("tarif_cat_" + season, null)
+        val isEarly = prefs.getBoolean("tarif_early_" + season, fallback.isEarlyBird)
+        val cat = if (catName != null) {
+            try { TarifCategory.valueOf(catName) } catch (_: Exception) { fallback.category }
+        } else {
+            fallback.category
+        }
+        return TicketConfig(category = cat, isEarlyBird = isEarly)
+    }
+
+    val dashboardStats: Flow<DashboardStats> = combine(seasonVisits, ticketConfig, _selectedSeason) { visits, baseConfig, season ->
+        val config = getTicketConfigForSeason(season, baseConfig)
         val totalValue = visits.sumOf { it.savedAmount }
         val purchasePrice = if (config.isEarlyBird) config.category.earlyBirdPrice else config.category.normalPrice
         val remaining = (purchasePrice - totalValue).coerceAtLeast(0.0)
@@ -92,7 +105,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         _selectedSeason.value = season
     }
 
-    fun saveTicketConfig(config: TicketConfig) {
+    fun saveTicketConfig(config: TicketConfig, season: String = _selectedSeason.value) {
+        prefs.edit()
+            .putString("tarif_cat_" + season, config.category.name)
+            .putBoolean("tarif_early_" + season, config.isEarlyBird)
+            .apply()
         viewModelScope.launch {
             repository.saveTicketConfig(config)
         }
