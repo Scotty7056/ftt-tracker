@@ -2065,6 +2065,7 @@ fun EditVisitDialog(
 
 @Composable
 fun TarifSelectionDialog(
+    season: String = getSeasonForDate(LocalDate.now()),
     currentConfig: TicketConfig,
     viewModel: TrackerViewModel,
     onDismiss: () -> Unit,
