@@ -2105,7 +2105,7 @@ fun TarifSelectionDialog(
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (isHistorical) {
                     Text(
-                        text = "Fuer vergangene Saisons gelten individuelle Ticketpreise. Gib hier deinen tatsaechlichen damaligen Kaufpreis ein:",
+                        text = "Für vergangene Saisons gelten individuelle Ticketpreise. Gib hier deinen tatsächlichen damaligen Kaufpreis ein:",
                         fontSize = 13.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -2128,7 +2128,7 @@ fun TarifSelectionDialog(
                 } else {
                     OutlinedButton(
                         onClick = {
-                            viewModel.manualPriceSync { success, msg ->
+                            viewModel.manualPriceSync { _, msg ->
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }
                         },
@@ -2157,7 +2157,7 @@ fun TarifSelectionDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-                                Text("Verguenstigter Preis vor Saisonstart", fontSize = 12.sp, color = Color.Gray)
+                                Text("Vergünstigter Preis vor Saisonstart", fontSize = 12.sp, color = Color.Gray)
                             }
                         }
                     }
