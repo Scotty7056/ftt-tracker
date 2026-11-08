@@ -1618,41 +1618,6 @@ fun PartnerListView(
                                     Text("${"%.0f".format(dist)} km", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GlacierBlue, softWrap = false)
                                 }
                             }
-
-                    // personBadgeRow
-                    if (persons.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            persons.forEach { p ->
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = GlacierBlue.copy(alpha = 0.12f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Person,
-                                            contentDescription = null,
-                                            tint = GlacierBlue,
-                                            modifier = Modifier.size(10.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = p.name,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GlacierBlue
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
                         }
                     }
                 }
@@ -1735,41 +1700,6 @@ fun VenueDetailBottomSheet(
                     if (venue.subtitle.isNotEmpty()) Text(venue.subtitle, fontSize = 13.sp, color = Color.Gray)
                 }
             }
-
-                    // personBadgeRow
-                    if (persons.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            persons.forEach { p ->
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = GlacierBlue.copy(alpha = 0.12f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Person,
-                                            contentDescription = null,
-                                            tint = GlacierBlue,
-                                            modifier = Modifier.size(10.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = p.name,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GlacierBlue
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -2076,41 +2006,6 @@ fun ModernVisitCard(
                         Text(" • ${visit.notes}", fontSize = 12.sp, color = GlacierBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-
-                    // personBadgeRow
-                    if (persons.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            persons.forEach { p ->
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = GlacierBlue.copy(alpha = 0.12f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Person,
-                                            contentDescription = null,
-                                            tint = GlacierBlue,
-                                            modifier = Modifier.size(10.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = p.name,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GlacierBlue
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
