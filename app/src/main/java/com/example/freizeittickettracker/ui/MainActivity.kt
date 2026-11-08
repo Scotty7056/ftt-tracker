@@ -1,5 +1,7 @@
 package com.example.freizeittickettracker.ui
 
+
+import androidx.compose.foundation.BorderStroke
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -17,31 +19,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
