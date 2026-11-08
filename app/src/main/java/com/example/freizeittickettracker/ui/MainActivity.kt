@@ -2666,7 +2666,7 @@ fun FamilySettingsDialog(
     val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
 
     var nameInput by remember { mutableStateOf("") }
-    var birthDateInput by remember { mutableStateOf("") }
+    var birthYearInput by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
 
     var pendingCsvContent by remember { mutableStateOf<String?>(null) }
@@ -2750,7 +2750,7 @@ fun FamilySettingsDialog(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(person.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
                                         Text(
-                                            "Geb: ${person.birthDate}  •  ${tarifPrice.formatEuro()}",
+                                            "Geb: ${person.birthYear}  •  ${tarifPrice.formatEuro()}",
                                             fontSize = 12.sp,
                                             color = GlacierBlue,
                                             fontWeight = FontWeight.Medium
@@ -2783,10 +2783,10 @@ fun FamilySettingsDialog(
                 )
 
                 OutlinedTextField(
-                    value = birthDateInput,
-                    onValueChange = { birthDateInput = it; inputError = null },
-                    label = { Text("Geburtsdatum (JJJJ-MM-TT)", fontSize = 12.sp) },
-                    placeholder = { Text("2008-05-14", fontSize = 12.sp) },
+                    value = birthYearInput,
+                    onValueChange = { birthYearInput = it; inputError = null },
+                    label = { Text("Geburtsjahr (z.B. 2008)", fontSize = 12.sp) },
+                    placeholder = { Text("2008", fontSize = 12.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -2799,25 +2799,21 @@ fun FamilySettingsDialog(
                 Button(
                     onClick = {
                         val trimmedName = nameInput.trim()
-                        val trimmedDate = birthDateInput.trim()
-                        if (trimmedName.isEmpty()) {
-                            inputError = "Bitte einen Namen eingeben."
+                        val trimmedYear = birthYearInput.trim()
+                        val parsedYear = trimmedYear.toIntOrNull()
+                        if (parsedYear == null || parsedYear !in 1920..2026) {
+                            inputError = "Bitte ein gültiges 4-stelliges Geburtsjahr eingeben (z.B. 2008)."
                             return@Button
                         }
-                        try {
-                            val parsedDate = LocalDate.parse(trimmedDate)
-                            viewModel.addPerson(
-                                PersonProfile(
-                                    name = trimmedName,
-                                    birthDate = parsedDate.toString()
-                                )
+                        viewModel.addPerson(
+                            PersonProfile(
+                                name = trimmedName,
+                                birthYear = parsedYear
                             )
-                            nameInput = ""
-                            birthDateInput = ""
-                            inputError = null
-                        } catch (_: Exception) {
-                            inputError = "Ungültiges Format! Bitte JJJJ-MM-TT nutzen."
-                        }
+                        )
+                        nameInput = ""
+                        birthYearInput = ""
+                        inputError = null
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
