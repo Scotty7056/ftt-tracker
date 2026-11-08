@@ -935,7 +935,7 @@ fun CalendarView(
                         Icon(Icons.Rounded.ChevronLeft, contentDescription = "Zur\u00FCck")
                     }
                     Text(
-                        text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)),
+                        text = currentMonth.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = AlpineDark
@@ -994,7 +994,7 @@ fun CalendarView(
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "Ausflüge am ${selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN))}",
+            "Ausflüge am ${selectedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN))}",
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             color = AlpineDark
@@ -1525,7 +1525,7 @@ fun VenueDetailBottomSheet(
                             color = Color.Gray
                         )
                         Text(
-                            text = selectedDate.format(DateTimeFormatter.ofPattern("dd. MMMM yyyy", Locale.GERMAN)),
+                            text = selectedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = AlpineDark
@@ -1832,7 +1832,7 @@ fun ManualVisitDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Datum des Ausflugs", fontSize = 11.sp, color = Color.Gray)
-                            Text(selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                            Text(selectedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                             Text("Zugeordnete Saison: ${getSeasonForDate(selectedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
                         }
                         Text("ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
@@ -2005,7 +2005,7 @@ fun EditVisitDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Besuchsdatum", fontSize = 11.sp, color = Color.Gray)
-                            Text(editedDate.format(DateTimeFormatter.ofPattern("EEEE, dd. MMMM yyyy", Locale.GERMAN)), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
+                            Text(editedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                             Text("Zugeordnete Saison: ${getSeasonForDate(editedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
                         }
                         Text("ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
