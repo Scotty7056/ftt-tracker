@@ -251,4 +251,16 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
-    }}
+    }    fun restoreVisits(visits: List<VisitEntity>, onComplete: (Int) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            var count = 0
+            for (v in visits) {
+                db.visitDao().insertVisit(v.copy(id = 0))
+                count++
+            }
+            withContext(Dispatchers.Main) {
+                onComplete(count)
+            }
+        }
+    }
+}

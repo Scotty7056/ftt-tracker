@@ -1,4 +1,6 @@
 package com.example.freizeittickettracker.ui
+
+import com.example.freizeittickettracker.ui.components.FamilyProfilesDialog
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -925,6 +927,27 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
                             Text("Backup", fontSize = 11.sp, maxLines = 1)
                         }
                     }
+                        // Wiederherstellen Button
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val restored = AutoBackupManager.restoreAutoBackup(context)
+                                    if (restored.isNotEmpty()) {
+                                        viewModel.restoreVisits(restored) { count ->
+                                            Toast.makeText(context, "\u2705 $count Aktivitäten wiederhergestellt!", Toast.LENGTH_LONG).show()
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "\u26A0\uFE0F Kein lokales Backup gefunden", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Restore", fontSize = 11.sp, maxLines = 1)
+                        }
                 }
             }
         }
@@ -973,7 +996,7 @@ fun CalendarView(
                         Icon(Icons.Rounded.ChevronLeft, contentDescription = "Zur\u00FCck")
                     }
                     Text(
-                        text = currentMonth.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)),
+                        text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = AlpineDark

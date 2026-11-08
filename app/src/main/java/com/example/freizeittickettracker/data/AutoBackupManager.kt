@@ -15,6 +15,7 @@ object AutoBackupManager {
     }
 
     fun performAutoBackup(context: Context, visits: List<VisitEntity>) {
+        if (visits.isEmpty()) return
         try {
             val file = File(context.filesDir, "ftt_auto_backup.csv")
             file.writeText(exportCsv(visits))
@@ -89,5 +90,17 @@ object AutoBackupManager {
             )
         }
         return parsedVisits
+    }
+    fun restoreAutoBackup(context: Context): List<VisitEntity> {
+        return try {
+            val file = File(context.filesDir, "ftt_auto_backup.csv")
+            if (file.exists() && file.length() > 0) {
+                parseCsvToVisits(file.readText())
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }
