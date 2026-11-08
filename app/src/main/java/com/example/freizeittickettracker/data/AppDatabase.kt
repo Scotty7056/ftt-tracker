@@ -1,5 +1,9 @@
 package com.example.freizeittickettracker.data
 
+import com.example.freizeittickettracker.data.model.PersonProfile
+import com.example.freizeittickettracker.data.model.VisitPersonCrossRef
+import com.example.freizeittickettracker.data.dao.PersonDao
+
 import android.content.Context
 import androidx.room.*
 import androidx.room.migration.Migration
@@ -14,7 +18,7 @@ class Converters {
     fun dateToTimestamp(date: LocalDate?): String? = date?.toString()
 }
 
-@Database(entities = [VisitEntity::class, TicketConfigEntity::class], version = 2, exportSchema = false)
+@Database(entities = [VisitEntity::class, TicketConfigEntity::class, PersonProfile::class, VisitPersonCrossRef::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun visitDao(): VisitDao
@@ -45,4 +49,5 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
     }
+    abstract fun personDao(): PersonDao
 }

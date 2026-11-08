@@ -1,5 +1,8 @@
 package com.example.freizeittickettracker.ui
 
+import com.example.freizeittickettracker.ui.components.FamilyCheckInSelector
+import com.example.freizeittickettracker.data.model.PersonProfile
+
 
 import androidx.compose.foundation.BorderStroke
 import android.Manifest

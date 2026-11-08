@@ -1,5 +1,9 @@
 package com.example.freizeittickettracker.data
 
+import com.example.freizeittickettracker.data.model.PersonProfile
+import com.example.freizeittickettracker.data.model.VisitPersonCrossRef
+import com.example.freizeittickettracker.domain.FamilyTarifEngine
+
 import android.app.Application
 import android.location.Location
 import androidx.lifecycle.AndroidViewModel
@@ -207,5 +211,45 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         } catch (_: SecurityException) {}
+    }
+
+    // --- Familien- und Mehrpersonen-Verwaltung ---
+    val allPersons = database.personDao().getAllPersons()
+
+    fun addPerson(name: String, birthYear: Int, isEarlyBird: Boolean = true, customPrice: Double? = null) {
+        viewModelScope.launch {
+            val p = PersonProfile(
+                name = name,
+                birthYear = birthYear,
+                isEarlyBird = isEarlyBird,
+                customTicketPrice = customPrice
+            )
+            database.personDao().insertPerson(p)
+        }
+    }
+
+    fun deletePerson(person: PersonProfile) {
+        viewModelScope.launch {
+            database.personDao().deletePerson(person)
+        }
+    }
+
+    suspend fun getPersonsForVisit(visitId: Long): List<Long> {
+        return database.personDao().getPersonIdsForVisit(visitId)
+    }
+
+    fun saveVisitWithPersons(visit: VenueVisit, personIds: List<Long>) {
+        viewModelScope.launch {
+            val visitId = if (visit.id == 0L) {
+                database.venueVisitDao().insertVisit(visit)
+            } else {
+                database.venueVisitDao().updateVisit(visit)
+                visit.id
+            }
+            database.personDao().deleteCrossRefsForVisit(visitId)
+            personIds.forEach { pId ->
+                database.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(visitId, pId))
+            }
+        }
     }
 }
