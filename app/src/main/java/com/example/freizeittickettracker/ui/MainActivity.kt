@@ -2651,27 +2651,66 @@ fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
     return BitmapDrawable(context.resources, bitmap)
 }
 // ==========================================
-// FAMILIENMITGLIEDER & PROFILE DIALOG
+// FAMILIENMITGLIEDER & EINSTELLUNGEN DIALOG
 // ==========================================
 @Composable
 fun FamilySettingsDialog(
+    viewModel: TrackerViewModel,
     persons: List<PersonProfile>,
     season: String,
-    onAddPerson: (PersonProfile) -> Unit,
-    onDeletePerson: (PersonProfile) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val visits by viewModel.allVisits.collectAsState(initial = emptyList())
+    val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
+
     var nameInput by remember { mutableStateOf("") }
     var birthDateInput by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
+
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val text = stream.bufferedReader().readText()
+                    viewModel.importVisitsFromCsv(text) { count ->
+                        Toast.makeText(context, "\u2705 $count Einträge erfolgreich importiert!", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Fehler beim Import: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.People, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.Settings, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Familie & Profile", fontWeight = FontWeight.Bold, color = AlpineDark, fontSize = 18.sp)
+                Text("Einstellungen & Daten", fontWeight = FontWeight.Bold, color = AlpineDark, fontSize = 18.sp)
             }
         },
         text = {
@@ -2679,16 +2718,22 @@ fun FamilySettingsDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // ABSCHNITT 1: FAMILIENMITGLIEDER
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.People, contentDescription = null, tint = AlpineNavy, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Familienmitglieder (${persons.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineNavy)
+                }
+
                 Text(
-                    "Verwalte hier Familienmitglieder. Der passende Tarif für Saison $season wird anhand des Geburtsdatums ermittelt.",
-                    fontSize = 12.sp,
+                    "Tarife für Saison $season werden automatisch anhand des Geburtsdatums ermittelt.",
+                    fontSize = 11.sp,
                     color = Color.Gray
                 )
 
                 if (persons.isNotEmpty()) {
-                    Text("Aktive Profile (${persons.size}):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineNavy)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         persons.forEach { person ->
                             val tarifPrice = FamilyTarifEngine.calculateTicketPrice(person, season)
@@ -2712,7 +2757,7 @@ fun FamilySettingsDialog(
                                         )
                                     }
                                     IconButton(
-                                        onClick = { onDeletePerson(person) },
+                                        onClick = { viewModel.deletePerson(person) },
                                         modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
@@ -2726,15 +2771,12 @@ fun FamilySettingsDialog(
                             }
                         }
                     }
-                    Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.4f))
                 }
-
-                Text("Neues Mitglied anlegen:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineNavy)
 
                 OutlinedTextField(
                     value = nameInput,
                     onValueChange = { nameInput = it; inputError = null },
-                    label = { Text("Name (z.B. Jakob)") },
+                    label = { Text("Name (z.B. Jakob)", fontSize = 12.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -2743,8 +2785,8 @@ fun FamilySettingsDialog(
                 OutlinedTextField(
                     value = birthDateInput,
                     onValueChange = { birthDateInput = it; inputError = null },
-                    label = { Text("Geburtsdatum (JJJJ-MM-TT)") },
-                    placeholder = { Text("2008-05-14") },
+                    label = { Text("Geburtsdatum (JJJJ-MM-TT)", fontSize = 12.sp) },
+                    placeholder = { Text("2008-05-14", fontSize = 12.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -2764,7 +2806,7 @@ fun FamilySettingsDialog(
                         }
                         try {
                             val parsedDate = LocalDate.parse(trimmedDate)
-                            onAddPerson(
+                            viewModel.addPerson(
                                 PersonProfile(
                                     name = trimmedName,
                                     birthDate = parsedDate.toString()
@@ -2774,7 +2816,7 @@ fun FamilySettingsDialog(
                             birthDateInput = ""
                             inputError = null
                         } catch (_: Exception) {
-                            inputError = "Ungültiges Datumsformat! Bitte JJJJ-MM-TT verwenden."
+                            inputError = "Ungültiges Format! Bitte JJJJ-MM-TT nutzen."
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -2783,13 +2825,101 @@ fun FamilySettingsDialog(
                 ) {
                     Icon(Icons.Rounded.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Profil hinzufügen")
+                    Text("Profil anlegen", fontSize = 12.sp)
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.4f))
+
+                // ABSCHNITT 2: DATENSICHERUNG & EXPORT
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Storage, contentDescription = null, tint = AlpineNavy, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Datensicherung & Backup", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineNavy)
+                }
+
+                Text(
+                    "Besuche als CSV sichern, Notizen importieren oder ein lokales Backup erstellen.",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = {
+                            val personMap = persons.associateBy { it.id }
+                            val personsByVisit = crossRefs.groupBy { it.visitId }.mapValues { (_, refs) ->
+                                refs.mapNotNull { personMap[it.personId]?.name }
+                            }
+                            val csvData = AutoBackupManager.exportCsv(visits, personsByVisit)
+                            pendingCsvContent = csvData
+                            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                            csvExportLauncher.launch("ftt_visits_$timestamp.csv")
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Export", fontSize = 11.sp, maxLines = 1)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            importLauncher.launch(arrayOf("text/*", "text/comma-separated-values", "text/csv", "application/csv"))
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Import", fontSize = 11.sp, maxLines = 1)
+                    }
+
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                AutoBackupManager.performAutoBackup(context, visits)
+                                Toast.makeText(context, "\u2705 Lokales Backup gespeichert", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Backup", fontSize = 11.sp, maxLines = 1)
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            val restored = AutoBackupManager.restoreAutoBackup(context)
+                            if (restored.isNotEmpty()) {
+                                viewModel.restoreVisits(restored) { count ->
+                                    Toast.makeText(context, "\u2705 $count Einträge wiederhergestellt!", Toast.LENGTH_LONG).show()
+                                }
+                            } else {
+                                Toast.makeText(context, "\u26A0\uFE0F Kein lokales Backup vorhanden", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Aus lokalem Backup wiederherstellen", fontSize = 12.sp)
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Fertig", fontWeight = FontWeight.Bold, color = AlpineNavy)
+                Text("Schließen", fontWeight = FontWeight.Bold, color = AlpineNavy)
             }
         }
     )
