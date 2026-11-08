@@ -511,6 +511,7 @@ fun DashboardView(
             val matchingVisitIds = crossRefs.filter { it.personId == selectedPersonFilterId }.map { it.visitId }.toSet()
             visits.filter { it.id in matchingVisitIds }
         }
+    }
 
     val selectedPerson = remember(allPersonsForFilter, selectedPersonFilterId) {
         allPersonsForFilter.find { it.id == selectedPersonFilterId }
@@ -840,6 +841,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             val matchingVisitIds = crossRefs.filter { it.personId == selectedPersonFilterId }.map { it.visitId }.toSet()
             visits.filter { it.id in matchingVisitIds }
         }
+    }
 
     val selectedPerson = remember(allPersonsForFilter, selectedPersonFilterId) {
         allPersonsForFilter.find { it.id == selectedPersonFilterId }
