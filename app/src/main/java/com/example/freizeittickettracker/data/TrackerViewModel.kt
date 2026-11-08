@@ -53,6 +53,8 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     val ticketConfig: Flow<TicketConfig> = repository.ticketConfigFlow
 
+        val allPersons = db.personDao().getAllPersons()
+    val allCrossRefs = db.personDao().getAllCrossRefsFlow()
     val allVisits: Flow<List<VisitEntity>> = repository.allVisits
 
     val availableSeasons: StateFlow<List<String>> = repository.allVisits

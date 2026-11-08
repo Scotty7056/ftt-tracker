@@ -30,4 +30,6 @@ interface PersonDao {
 
     @Query("SELECT personId FROM visit_person_cross_ref WHERE visitId = :visitId")
     suspend fun getPersonIdsForVisit(visitId: Long): List<Long>
+    @Query("SELECT * FROM visit_person_cross_ref")
+    fun getAllCrossRefsFlow(): Flow<List<VisitPersonCrossRef>>
 }

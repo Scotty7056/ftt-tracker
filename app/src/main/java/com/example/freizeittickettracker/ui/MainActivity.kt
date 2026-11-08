@@ -492,6 +492,46 @@ fun DashboardView(
 ) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
+    val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
+    val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
+    var selectedPersonFilterId by remember { mutableStateOf<Long?>(null) }
+
+    val displayVisits = remember(visits, crossRefs, selectedPersonFilterId) {
+        if (selectedPersonFilterId == null) {
+            visits
+        } else {
+            val matchingVisitIds = crossRefs.filter { it.personId == selectedPersonFilterId }.map { it.visitId }.toSet()
+            visits.filter { it.id in matchingVisitIds }
+        }
+
+    val selectedPerson = remember(allPersonsForFilter, selectedPersonFilterId) {
+        allPersonsForFilter.find { it.id == selectedPersonFilterId }
+    }
+
+    val effectiveTicketPrice = remember(selectedPerson, stats.purchasePrice, stats.season) {
+        if (selectedPerson != null) {
+            FamilyTarifEngine.calculateTicketPrice(selectedPerson, stats.season)
+        } else {
+            stats.purchasePrice
+        }
+    }
+
+    val effectiveSavedAmount = remember(displayVisits) {
+        displayVisits.sumOf { it.savedAmount }
+    }
+
+    val effectiveProgress = remember(effectiveSavedAmount, effectiveTicketPrice) {
+        if (effectiveTicketPrice > 0) (effectiveSavedAmount / effectiveTicketPrice).toFloat().coerceIn(0f, 1f) else 0f
+    }
+
+    val effectiveRemaining = remember(effectiveSavedAmount, effectiveTicketPrice) {
+        (effectiveTicketPrice - effectiveSavedAmount).coerceAtLeast(0.0)
+    }
+
+    val effectiveNetGain = remember(effectiveSavedAmount, effectiveTicketPrice) {
+        (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
+    }
+    }
     val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
     var showAddVisitDialog by remember { mutableStateOf(false) }
 
@@ -500,6 +540,48 @@ fun DashboardView(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
+                if (allPersonsForFilter.isNotEmpty()) {
+            item {
+                // PersonFilterChipRow
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedPersonFilterId == null,
+                            onClick = { selectedPersonFilterId = null },
+                            label = { Text("Alle Personen", fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GlacierBlue,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                    items(allPersonsForFilter) { person ->
+                        FilterChip(
+                            selected = selectedPersonFilterId == person.id,
+                            onClick = {
+                                selectedPersonFilterId = if (selectedPersonFilterId == person.id) null else person.id
+                            },
+                            label = { Text(person.name, fontSize = 12.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GlacierBlue,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        }
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -533,7 +615,7 @@ fun DashboardView(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Kaufpreis: ${stats.purchasePrice.formatEuro()}",
+                                    text = "Kaufpreis: ${effectiveTicketPrice.formatEuro()}",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color.White,
@@ -641,7 +723,7 @@ fun DashboardView(
             }
         }
 
-        if (visits.isEmpty()) {
+        if (displayVisits.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -656,8 +738,14 @@ fun DashboardView(
                 }
             }
         } else {
-            items(visits) { visit ->
-                ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
+            items(displayVisits) { visit ->
+                val visitPersons by viewModel.getPersonsForVisit(visit.id).collectAsState(initial = emptyList())
+                    ModernVisitCard(
+                        visit = visit,
+                        persons = visitPersons,
+                        onEdit = { onRequestEditVisit(visit) },
+                        onDelete = { onRequestDeleteVisit(visit) }
+                    )
             }
         }
 
@@ -715,6 +803,67 @@ fun DashboardView(
 fun StatisticsView(viewModel: TrackerViewModel) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
+    val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
+    val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
+    var selectedPersonFilterId by remember { mutableStateOf<Long?>(null) }
+
+    val displayVisits = remember(visits, crossRefs, selectedPersonFilterId) {
+        if (selectedPersonFilterId == null) {
+            visits
+        } else {
+            val matchingVisitIds = crossRefs.filter { it.personId == selectedPersonFilterId }.map { it.visitId }.toSet()
+            visits.filter { it.id in matchingVisitIds }
+        }
+    }
+
+    val selectedPerson = remember(allPersonsForFilter, selectedPersonFilterId) {
+        allPersonsForFilter.find { it.id == selectedPersonFilterId }
+    }
+
+    val effectiveTicketPrice = remember(selectedPerson, stats.purchasePrice, stats.season) {
+        if (selectedPerson != null) {
+            FamilyTarifEngine.calculateTicketPrice(selectedPerson, stats.season)
+        } else {
+            stats.purchasePrice
+        }
+    }
+
+    val displayVisits = remember(visits, crossRefs, selectedPersonFilterId) {
+        if (selectedPersonFilterId == null) {
+            visits
+        } else {
+            val matchingVisitIds = crossRefs.filter { it.personId == selectedPersonFilterId }.map { it.visitId }.toSet()
+            visits.filter { it.id in matchingVisitIds }
+        }
+
+    val selectedPerson = remember(allPersonsForFilter, selectedPersonFilterId) {
+        allPersonsForFilter.find { it.id == selectedPersonFilterId }
+    }
+
+    val effectiveTicketPrice = remember(selectedPerson, stats.purchasePrice, stats.season) {
+        if (selectedPerson != null) {
+            FamilyTarifEngine.calculateTicketPrice(selectedPerson, stats.season)
+        } else {
+            stats.purchasePrice
+        }
+    }
+
+    val effectiveSavedAmount = remember(displayVisits) {
+        displayVisits.sumOf { it.savedAmount }
+    }
+
+    val effectiveProgress = remember(effectiveSavedAmount, effectiveTicketPrice) {
+        if (effectiveTicketPrice > 0) (effectiveSavedAmount / effectiveTicketPrice).toFloat().coerceIn(0f, 1f) else 0f
+    }
+
+    val effectiveRemaining = remember(effectiveSavedAmount, effectiveTicketPrice) {
+        (effectiveTicketPrice - effectiveSavedAmount).coerceAtLeast(0.0)
+    }
+
+    val effectiveNetGain = remember(effectiveSavedAmount, effectiveTicketPrice) {
+        (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
+    }
+    }
         val context = LocalContext.current
     var pendingCsvContent by remember { mutableStateOf<String?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
@@ -752,10 +901,10 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         }
     }
 
-    val categoryStats = remember(visits) {
-        val total = visits.sumOf { it.savedAmount }
+    val categoryStats = remember(displayVisits) {
+        val total = displayVisits.sumOf { it.savedAmount }
         VenueCategory.entries.mapNotNull { cat ->
-            val catVisits = visits.filter { it.category == cat.name }
+            val catVisits = displayVisits.filter { it.category == cat.name }
             if (catVisits.isEmpty()) null
             else {
                 val sum = catVisits.sumOf { it.savedAmount }
@@ -765,16 +914,15 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         }.sortedByDescending { it.totalSaved }
     }
 
-    val topVenues = remember(visits) {
-        visits.groupBy { it.venueName }
+    val topVenues = remember(displayVisits) { displayVisits.groupBy { it.venueName }
             .map { (name, list) -> VenueTopStat(name, list.size, list.sumOf { it.savedAmount }) }
             .sortedByDescending { it.count }
             .take(3)
     }
 
-    val costPerSkiDay = remember(stats.purchasePrice, visits) {
-        val skiVisits = visits.count { it.category == VenueCategory.SKI.name }
-        if (skiVisits > 0) stats.purchasePrice / skiVisits else 0.0
+    val costPerSkiDay = remember(effectiveTicketPrice, displayVisits) {
+        val skiVisits = displayVisits.count { it.category == VenueCategory.SKI.name }
+        if (skiVisits > 0) effectiveTicketPrice / skiVisits else 0.0
     }
 
     LazyColumn(
@@ -1090,7 +1238,13 @@ fun CalendarView(
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(selectedVisits) { visit ->
-                    ModernVisitCard(visit = visit, onEdit = { onRequestEditVisit(visit) }, onDelete = { onRequestDeleteVisit(visit) })
+                    val visitPersons by viewModel.getPersonsForVisit(visit.id).collectAsState(initial = emptyList())
+                    ModernVisitCard(
+                        visit = visit,
+                        persons = visitPersons,
+                        onEdit = { onRequestEditVisit(visit) },
+                        onDelete = { onRequestDeleteVisit(visit) }
+                    )
                 }
             }
         }
@@ -1476,6 +1630,41 @@ fun PartnerListView(
                                     Text("${"%.0f".format(dist)} km", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GlacierBlue, softWrap = false)
                                 }
                             }
+
+                    // personBadgeRow
+                    if (persons.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            persons.forEach { p ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GlacierBlue.copy(alpha = 0.12f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Person,
+                                            contentDescription = null,
+                                            tint = GlacierBlue,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = p.name,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GlacierBlue
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                         }
                     }
                 }
@@ -1558,6 +1747,41 @@ fun VenueDetailBottomSheet(
                     if (venue.subtitle.isNotEmpty()) Text(venue.subtitle, fontSize = 13.sp, color = Color.Gray)
                 }
             }
+
+                    // personBadgeRow
+                    if (persons.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            persons.forEach { p ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GlacierBlue.copy(alpha = 0.12f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Person,
+                                            contentDescription = null,
+                                            tint = GlacierBlue,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = p.name,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GlacierBlue
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -1831,7 +2055,12 @@ fun CategoryBadge(
 }
 
 @Composable
-fun ModernVisitCard(visit: VisitEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun ModernVisitCard(
+    visit: VisitEntity,
+    persons: List<PersonProfile> = emptyList(),
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onEdit() },
         shape = RoundedCornerShape(16.dp),
@@ -1860,6 +2089,41 @@ fun ModernVisitCard(visit: VisitEntity, onEdit: () -> Unit, onDelete: () -> Unit
                         Text(" • ${visit.notes}", fontSize = 12.sp, color = GlacierBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+
+                    // personBadgeRow
+                    if (persons.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            persons.forEach { p ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GlacierBlue.copy(alpha = 0.12f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Person,
+                                            contentDescription = null,
+                                            tint = GlacierBlue,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = p.name,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GlacierBlue
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
