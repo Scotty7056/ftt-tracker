@@ -321,18 +321,19 @@ fun MainScreen(
                             Text("Tarif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        IconButton(
-                            onClick = { showFamilyDialog = true },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Rounded.Settings,
-                                contentDescription = "Einstellungen & Familie",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { showFamilyDialog = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Settings,
+                            contentDescription = "Einstellungen & Daten",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AlpineNavy)
             )
