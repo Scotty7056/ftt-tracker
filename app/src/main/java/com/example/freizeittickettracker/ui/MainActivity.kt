@@ -2762,3 +2762,4 @@ fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
 
     return BitmapDrawable(context.resources, bitmap)
 }
+}
