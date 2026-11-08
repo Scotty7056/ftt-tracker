@@ -1135,8 +1135,6 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
         }
     }
 }
-}
-
 // ==========================================
 // 3. KALENDER & KARTE
 // ==========================================
