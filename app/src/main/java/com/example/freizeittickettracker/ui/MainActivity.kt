@@ -434,11 +434,22 @@ fun MainScreen(
         }
 
         visitPendingEdit?.let { visit ->
+            val allPersonsList by viewModel.allPersons.collectAsState(initial = emptyList())
+            val existingPersons by viewModel.getPersonsForVisit(visit.id).collectAsState(initial = emptyList())
+            val initialPersonIds = remember(existingPersons) { existingPersons.map { it.id } }
+
             EditVisitDialog(
                 visit = visit,
+                allPersons = allPersonsList,
+                initialPersonIds = initialPersonIds,
                 onDismiss = { visitPendingEdit = null },
-                onSave = { updatedDate, updatedAmount, updatedNotes ->
-                    viewModel.updateVisit(visit.copy(date = updatedDate, savedAmount = updatedAmount, notes = updatedNotes))
+                onSave = { updatedDate, updatedAmount, updatedNotes, updatedPersonIds ->
+                    val updated = visit.copy(
+                        date = updatedDate,
+                        savedAmount = updatedAmount,
+                        notes = updatedNotes
+                    )
+                    viewModel.saveVisitWithPersons(updated, updatedPersonIds)
                     visitPendingEdit = null
                 }
             )
@@ -673,12 +684,24 @@ fun DashboardView(
     }
 
     if (showAddVisitDialog) {
+        val allPersonsList by viewModel.allPersons.collectAsState(initial = emptyList())
         ManualVisitDialog(
             venues = VenueCatalog.venues,
+            allPersons = allPersonsList,
             existingVisits = allVisits,
             onDismiss = { showAddVisitDialog = false },
-            onConfirm = { venue, date, amount, notes ->
-                viewModel.recordVisit(venue, date, notes, amount)
+            onConfirm = { venue, date, amount, notes, personIds ->
+                val season = getSeasonForDate(date)
+                val newVisit = VisitEntity(
+                    venueId = venue.id,
+                    venueName = venue.name,
+                    category = venue.category.name,
+                    date = date,
+                    savedAmount = amount,
+                    season = season,
+                    notes = notes
+                )
+                viewModel.saveVisitWithPersons(newVisit, personIds)
                 showAddVisitDialog = false
             }
         )
@@ -1881,28 +1904,12 @@ fun MetricTile(title: String, value: String, icon: androidx.compose.ui.graphics.
 @Composable
 fun ManualVisitDialog(
     venues: List<Venue>,
+    allPersons: List<PersonProfile> = emptyList(),
     existingVisits: List<VisitEntity> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (Venue, LocalDate, Double, String) -> Unit
+    onConfirm: (Venue, LocalDate, Double, String, List<Long>) -> Unit
 ) {
-        val context = LocalContext.current
-    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
-    val csvExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        uri?.let { targetUri ->
-            pendingCsvContent?.let { content ->
-                try {
-                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
-                        stream.write(content.toByteArray(Charsets.UTF_8))
-                    }
-                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
+    val context = LocalContext.current
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var priceText by remember {
@@ -1910,6 +1917,9 @@ fun ManualVisitDialog(
         mutableStateOf(String.format(Locale.US, "%.2f", initialEffective))
     }
     var notes by remember { mutableStateOf("") }
+    var selectedPersonIds by remember(allPersons) {
+        mutableStateOf(allPersons.filter { it.isDefaultSelected }.map { it.id }.toSet())
+    }
     var filterText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showDuplicateWarning by remember { mutableStateOf(false) }
@@ -2050,6 +2060,21 @@ fun ManualVisitDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
+                if (allPersons.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FamilyCheckInSelector(
+                        allPersons = allPersons,
+                        selectedPersonIds = selectedPersonIds,
+                        onTogglePerson = { pId ->
+                            selectedPersonIds = if (selectedPersonIds.contains(pId)) {
+                                selectedPersonIds - pId
+                            } else {
+                                selectedPersonIds + pId
+                            }
+                        }
+                    )
+                }
             }
         },
         confirmButton = {
@@ -2081,8 +2106,10 @@ fun ManualVisitDialog(
 @Composable
 fun EditVisitDialog(
     visit: VisitEntity,
+    allPersons: List<PersonProfile> = emptyList(),
+    initialPersonIds: List<Long> = emptyList(),
     onDismiss: () -> Unit,
-    onSave: (LocalDate, Double, String) -> Unit
+    onSave: (LocalDate, Double, String, List<Long>) -> Unit
 ) {
     var editedDate by remember { mutableStateOf(visit.date) }
     var editedNotes by remember { mutableStateOf(visit.notes) }
