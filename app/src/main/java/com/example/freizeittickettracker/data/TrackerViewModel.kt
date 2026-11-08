@@ -6,7 +6,6 @@ import com.example.freizeittickettracker.domain.FamilyTarifEngine
 
 import android.app.Application
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope

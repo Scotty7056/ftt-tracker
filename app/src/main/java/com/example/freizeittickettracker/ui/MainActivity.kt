@@ -539,7 +539,6 @@ fun DashboardView(
     val effectiveNetGain = remember(effectiveSavedAmount, effectiveTicketPrice) {
         (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
     }
-    }
     val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
     var showAddVisitDialog by remember { mutableStateOf(false) }
 
@@ -2064,7 +2063,7 @@ fun CategoryBadge(
 
 @Composable
 fun ModernVisitCard(
-    visit: VisitEntity,
+    visit: VisitEntity, persons: List<PersonProfile> = emptyList(),
     persons: List<PersonProfile> = emptyList(),
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -2387,6 +2386,9 @@ fun EditVisitDialog(
     var editedNotes by remember { mutableStateOf(visit.notes) }
     var editedPriceText by remember { mutableStateOf(String.format(Locale.US, "%.2f", visit.savedAmount)) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var selectedPersonIds by remember(initialPersonIds) {
+        mutableStateOf(initialPersonIds.toSet())
+    }
 
     val defaultVenuePrice = remember(visit.venueId) {
         VenueCatalog.findById(visit.venueId)?.normalTicketPrice
