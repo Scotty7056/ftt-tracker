@@ -870,7 +870,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
     val effectiveNetGain = remember(effectiveSavedAmount, effectiveTicketPrice) {
         (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
     }
-    }
         val context = LocalContext.current
     var pendingCsvContent by remember { mutableStateOf<String?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
