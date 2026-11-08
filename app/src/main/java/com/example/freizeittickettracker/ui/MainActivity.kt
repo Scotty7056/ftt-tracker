@@ -2074,67 +2074,162 @@ fun TarifSelectionDialog(
     onSave: (TicketConfig) -> Unit
 ) {
     val context = LocalContext.current
+    val currentSeasonStr = getSeasonForDate(LocalDate.now())
+    val isHistorical = season != currentSeasonStr
     var isEarlyBird by remember { mutableStateOf(currentConfig.isEarlyBird) }
     var selectedCategory by remember { mutableStateOf(currentConfig.category) }
 
+    val defaultPrice = if (currentConfig.isEarlyBird) currentConfig.category.earlyBirdPrice else currentConfig.category.normalPrice
+    var customPriceText by remember(season) {
+        val initialPrice = viewModel.getHistoricalSeasonPrice(season, defaultPrice)
+        mutableStateOf(String.format(java.util.Locale.US, "%.2f", initialPrice))
+    }
+    var customLabelText by remember(season) {
+        val initialLabel = viewModel.getHistoricalSeasonLabel(
+            season,
+            currentConfig.category.label + (if (currentConfig.isEarlyBird) " (Vorverkauf)" else "")
+        )
+        mutableStateOf(initialLabel)
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ticket-Tarif anpassen", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = AlpineDark) },
+        title = {
+            Text(
+                text = if (isHistorical) "Tarif Saison $season anpassen" else "Ticket-Tarif anpassen",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = AlpineDark
+            )
+        },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = {
-                        viewModel.manualPriceSync { success, msg ->
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Partnertarife jetzt online abgleichen", fontSize = 12.sp)
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))
-                ) {
-                    Row(modifier = Modifier.fillMaxWidth().clickable { isEarlyBird = !isEarlyBird }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = isEarlyBird, onCheckedChange = { isEarlyBird = it })
+                if (isHistorical) {
+                    Text(
+                        text = "F\u00FCr vergangene Saisons gelten individuelle Ticketpreise. Gib hier deinen tats\u00E4chlichen damaligen Kaufpreis ein:",
+                        fontSize = 13.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = customPriceText,
+                        onValueChange = { customPriceText = it },
+                        label = { Text("Kaufpreis (€)") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                    )
+                    OutlinedTextField(
+                        value = customLabelText,
+                        onValueChange = { customLabelText = it },
+                        label = { Text("Tarifbezeichnung (z. B. U23 Vorverkauf)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.manualPriceSync { _, msg ->
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("vergün\u00F6tigter Preis vor Saisonstart", fontSize = 11.sp, color = Color.Gray)
+                        Text("Partnertarife jetzt online abgleichen", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isEarlyBird,
+                                onCheckedChange = { isEarlyBird = it },
+                                colors = CheckboxDefaults.colors(checkedColor = GlacierBlue)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Vorverkaufstarif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                                Text("Verg\u00FCnstigter Preis vor Saisonstart", fontSize = 12.sp, color = Color.Gray)
+                            }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                for (category in TarifCategory.entries) {
-                    val price = if (isEarlyBird) category.earlyBirdPrice else category.normalPrice
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { selectedCategory = category }.padding(vertical = 6.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        RadioButton(selected = selectedCategory == category, onClick = { selectedCategory = category })
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(category.label, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(price.formatEuro(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineDark, softWrap = false)
+                        TarifCategory.values().forEach { cat ->
+                            val isSelected = cat == selectedCategory
+                            val price = if (isEarlyBird) cat.earlyBirdPrice else cat.normalPrice
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedCategory = cat },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) GlacierBlue.copy(alpha = 0.12f) else Color.Transparent,
+                                border = if (isSelected) BorderStroke(1.5.dp, GlacierBlue) else null
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { selectedCategory = cat },
+                                        colors = RadioButtonDefaults.colors(selectedColor = GlacierBlue)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        cat.label,
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 14.sp,
+                                        color = AlpineDark,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        String.format(java.util.Locale.GERMAN, "%.2f €", price),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = AlpineDark
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(TicketConfig(category = selectedCategory, isEarlyBird = isEarlyBird)) }, colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)) {
-                Text("Speichern")
+            Button(
+                onClick = {
+                    if (isHistorical) {
+                        val parsed = customPriceText.replace(",", ".").toDoubleOrNull() ?: defaultPrice
+                        val lbl = customLabelText.ifBlank { "Freizeitticket" }
+                        viewModel.saveHistoricalSeasonConfig(season, parsed, lbl)
+                        onDismiss()
+                    } else {
+                        onSave(TicketConfig(category = selectedCategory, isEarlyBird = isEarlyBird))
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Speichern", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen", color = Color.Gray)
+            }
         }
     )
 }
