@@ -187,6 +187,7 @@ fun MainScreen(
     }
 
     var showTarifDialog by remember { mutableStateOf(false) }
+    var showFamilyDialog by remember { mutableStateOf(false) }
     var visitPendingDeletion by remember { mutableStateOf<VisitEntity?>(null) }
     var visitPendingEdit by remember { mutableStateOf<VisitEntity?>(null) }
     var showBackgroundRationaleDialog by remember { mutableStateOf(false) }
@@ -320,6 +321,18 @@ fun MainScreen(
                             Text("Tarif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { showFamilyDialog = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Settings,
+                                contentDescription = "Einstellungen & Familie",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AlpineNavy)
             )
@@ -2636,4 +2649,148 @@ fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, 11f, centerPaint)
 
     return BitmapDrawable(context.resources, bitmap)
+}
+// ==========================================
+// FAMILIENMITGLIEDER & PROFILE DIALOG
+// ==========================================
+@Composable
+fun FamilySettingsDialog(
+    persons: List<PersonProfile>,
+    season: String,
+    onAddPerson: (PersonProfile) -> Unit,
+    onDeletePerson: (PersonProfile) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var nameInput by remember { mutableStateOf("") }
+    var birthDateInput by remember { mutableStateOf("") }
+    var inputError by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.People, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Familie & Profile", fontWeight = FontWeight.Bold, color = AlpineDark, fontSize = 18.sp)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Verwalte hier Familienmitglieder. Der passende Tarif für Saison $season wird anhand des Geburtsdatums ermittelt.",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+
+                if (persons.isNotEmpty()) {
+                    Text("Aktive Profile (${persons.size}):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineNavy)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        persons.forEach { person ->
+                            val tarifPrice = FamilyTarifEngine.calculateTicketPrice(person, season)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = GlacierBlue.copy(alpha = 0.08f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(person.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
+                                        Text(
+                                            "Geb: ${person.birthDate}  •  ${tarifPrice.formatEuro()}",
+                                            fontSize = 12.sp,
+                                            color = GlacierBlue,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onDeletePerson(person) },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Delete,
+                                            contentDescription = "Löschen",
+                                            tint = Color.Red.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.4f))
+                }
+
+                Text("Neues Mitglied anlegen:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AlpineNavy)
+
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it; inputError = null },
+                    label = { Text("Name (z.B. Jakob)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = birthDateInput,
+                    onValueChange = { birthDateInput = it; inputError = null },
+                    label = { Text("Geburtsdatum (JJJJ-MM-TT)") },
+                    placeholder = { Text("2008-05-14") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                inputError?.let { err ->
+                    Text(err, color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
+
+                Button(
+                    onClick = {
+                        val trimmedName = nameInput.trim()
+                        val trimmedDate = birthDateInput.trim()
+                        if (trimmedName.isEmpty()) {
+                            inputError = "Bitte einen Namen eingeben."
+                            return@Button
+                        }
+                        try {
+                            val parsedDate = LocalDate.parse(trimmedDate)
+                            onAddPerson(
+                                PersonProfile(
+                                    name = trimmedName,
+                                    birthDate = parsedDate.toString()
+                                )
+                            )
+                            nameInput = ""
+                            birthDateInput = ""
+                            inputError = null
+                        } catch (_: Exception) {
+                            inputError = "Ungültiges Datumsformat! Bitte JJJJ-MM-TT verwenden."
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+                ) {
+                    Icon(Icons.Rounded.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Profil hinzufügen")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Fertig", fontWeight = FontWeight.Bold, color = AlpineNavy)
+            }
+        }
+    )
 }
