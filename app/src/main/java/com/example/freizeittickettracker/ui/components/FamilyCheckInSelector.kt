@@ -12,8 +12,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.freizeittickettracker.data.model.PersonProfile
-import com.example.freizeittickettracker.ui.theme.AlpineDark
-import com.example.freizeittickettracker.ui.theme.GlacierBlue
+import com.example.freizeittickettracker.ui.AlpineDark
+import com.example.freizeittickettracker.ui.GlacierBlue
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

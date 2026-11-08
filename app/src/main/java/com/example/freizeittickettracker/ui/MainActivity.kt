@@ -878,7 +878,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             onClick = {
                                 coroutineScope.launch {
                                     AutoBackupManager.performAutoBackup(context, visits)
-                                    Toast.makeText(context, "✅ Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "\u2705 Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),

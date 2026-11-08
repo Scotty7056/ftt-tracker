@@ -214,7 +214,8 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // --- Familien- und Mehrpersonen-Verwaltung ---
-    val allPersons = database.personDao().getAllPersons()
+    private val db = AppDatabase.getDatabase(application)
+    val allPersons = db.personDao().getAllPersons()
 
     fun addPerson(name: String, birthYear: Int, isEarlyBird: Boolean = true, customPrice: Double? = null) {
         viewModelScope.launch {
@@ -224,32 +225,31 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 isEarlyBird = isEarlyBird,
                 customTicketPrice = customPrice
             )
-            database.personDao().insertPerson(p)
+            db.personDao().insertPerson(p)
         }
     }
 
     fun deletePerson(person: PersonProfile) {
         viewModelScope.launch {
-            database.personDao().deletePerson(person)
+            db.personDao().deletePerson(person)
         }
     }
 
     suspend fun getPersonsForVisit(visitId: Long): List<Long> {
-        return database.personDao().getPersonIdsForVisit(visitId)
+        return db.personDao().getPersonIdsForVisit(visitId)
     }
 
-    fun saveVisitWithPersons(visit: VenueVisit, personIds: List<Long>) {
+    fun saveVisitWithPersons(visit: VisitEntity, personIds: List<Long>) {
         viewModelScope.launch {
             val visitId = if (visit.id == 0L) {
-                database.venueVisitDao().insertVisit(visit)
+                db.visitDao().insertVisit(visit)
             } else {
-                database.venueVisitDao().updateVisit(visit)
+                db.visitDao().updateVisit(visit)
                 visit.id
             }
-            database.personDao().deleteCrossRefsForVisit(visitId)
+            db.personDao().deleteCrossRefsForVisit(visitId)
             personIds.forEach { pId ->
-                database.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(visitId, pId))
+                db.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(visitId, pId))
             }
         }
-    }
-}
+    }}

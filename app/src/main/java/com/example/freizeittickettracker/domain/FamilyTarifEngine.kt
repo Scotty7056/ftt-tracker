@@ -1,7 +1,7 @@
 package com.example.freizeittickettracker.domain
 
+import com.example.freizeittickettracker.data.TarifCategory
 import com.example.freizeittickettracker.data.model.PersonProfile
-import com.example.freizeittickettracker.data.model.TarifCategory
 
 object FamilyTarifEngine {
 
