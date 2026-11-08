@@ -1133,6 +1133,7 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
         }
     }
 }
+}
 
 // ==========================================
 // 3. KALENDER & KARTE
@@ -2064,7 +2065,6 @@ fun CategoryBadge(
 @Composable
 fun ModernVisitCard(
     visit: VisitEntity, persons: List<PersonProfile> = emptyList(),
-    persons: List<PersonProfile> = emptyList(),
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -2761,5 +2761,4 @@ fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, 11f, centerPaint)
 
     return BitmapDrawable(context.resources, bitmap)
-}
 }
