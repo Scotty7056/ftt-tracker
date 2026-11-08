@@ -2805,12 +2805,7 @@ fun FamilySettingsDialog(
                             inputError = "Bitte ein gültiges 4-stelliges Geburtsjahr eingeben (z.B. 2008)."
                             return@Button
                         }
-                        viewModel.addPerson(
-                            PersonProfile(
-                                name = trimmedName,
-                                birthYear = parsedYear
-                            )
-                        )
+                        viewModel.addPerson(name = trimmedName, birthYear = parsedYear)
                         nameInput = ""
                         birthYearInput = ""
                         inputError = null
