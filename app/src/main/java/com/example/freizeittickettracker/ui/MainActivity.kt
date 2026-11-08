@@ -1,5 +1,8 @@
 package com.example.freizeittickettracker.ui
 
+import com.example.freizeittickettracker.ui.components.StoryShareDialog
+import com.example.freizeittickettracker.domain.StorySummaryData
+
 import com.example.freizeittickettracker.ui.components.FamilyCheckInSelector
 import com.example.freizeittickettracker.data.model.PersonProfile
 
@@ -183,7 +186,24 @@ fun MainScreen(
     val selectedSeason by viewModel.selectedSeason.collectAsState()
     val availableSeasons by viewModel.availableSeasons.collectAsState(initial = listOf(selectedSeason))
     val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     val geofenceManager = remember { AppGeofenceManager(context) }
 
     val backgroundLocationLauncher = rememberLauncherForActivityResult(
@@ -669,7 +689,24 @@ fun DashboardView(
 fun StatisticsView(viewModel: TrackerViewModel) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     val coroutineScope = rememberCoroutineScope()
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -846,12 +883,9 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             onClick = {
                                 coroutineScope.launch {
                                     val csvData = AutoBackupManager.exportCsv(visits)
-                                    val sendIntent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        putExtra(Intent.EXTRA_TEXT, csvData)
-                                        type = "text/csv"
-                                    }
-                                    context.startActivity(Intent.createChooser(sendIntent, "CSV exportieren"))
+pendingCsvContent = csvData
+val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+csvExportLauncher.launch("ftt_visits_$timestamp.csv")
                                 }
                             },
                             shape = RoundedCornerShape(12.dp),
@@ -1022,7 +1056,24 @@ fun OsmMapOverviewView(
     focusVenue: Venue? = null
 ) {
     val venues = VenueCatalog.venues
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     val mapView = remember { MapView(context) }
     val markerMap = remember { mutableMapOf<String, Marker>() }
     val userLocation by viewModel.currentLocation.collectAsState(initial = null)
@@ -1269,7 +1320,24 @@ fun PartnerListView(
     onNavigateToMap: (Venue) -> Unit,
     onOpenDetail: (Venue) -> Unit
 ) {
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<VenueCategory?>(null) }
     val userLocation by viewModel.currentLocation.collectAsState(initial = null)
@@ -1378,7 +1446,24 @@ fun VenueDetailBottomSheet(
     onNavigateToMap: () -> Unit,
     onBookVisit: (LocalDate, Double, String) -> Unit
 ) {
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     val effectivePrice = remember(venue) { PriceSyncManager.getCustomPrice(context, venue.id, venue.normalTicketPrice) }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -1776,7 +1861,24 @@ fun ManualVisitDialog(
     onDismiss: () -> Unit,
     onConfirm: (Venue, LocalDate, Double, String) -> Unit
 ) {
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     var selectedVenue by remember { mutableStateOf(venues.first()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var priceText by remember {
@@ -2078,7 +2180,24 @@ fun TarifSelectionDialog(
     onDismiss: () -> Unit,
     onSave: (TicketConfig) -> Unit
 ) {
-    val context = LocalContext.current
+        val context = LocalContext.current
+    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { targetUri ->
+            pendingCsvContent?.let { content ->
+                try {
+                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                        stream.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     val currentSeasonStr = getSeasonForDate(LocalDate.now())
     val isHistorical = season != currentSeasonStr
     var isEarlyBird by remember { mutableStateOf(currentConfig.isEarlyBird) }
@@ -2317,4 +2436,25 @@ fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, 11f, centerPaint)
 
     return BitmapDrawable(context.resources, bitmap)
+
+    if (showStoryDialog) {
+        val topSpots = visits.groupBy { it.venueName }
+            .mapValues { it.value.size }
+            .toList()
+            .sortedByDescending { it.second }
+
+        val storyData = StorySummaryData(
+            season = selectedSeason,
+            totalVisits = visits.size,
+            totalSaved = currentSavings,
+            breakEvenReached = currentSavings >= 0,
+            topVenues = topSpots,
+            uniqueVenuesCount = topSpots.size
+        )
+
+        StoryShareDialog(
+            data = storyData,
+            onDismiss = { showStoryDialog = false }
+        )
+    }
 }
