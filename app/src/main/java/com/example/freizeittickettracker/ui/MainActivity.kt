@@ -1,4 +1,6 @@
 package com.example.freizeittickettracker.ui
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 import com.example.freizeittickettracker.ui.components.StoryShareDialog
 import com.example.freizeittickettracker.domain.StorySummaryData
@@ -2436,25 +2438,4 @@ fun createMyLocationMarkerDrawable(context: Context): BitmapDrawable {
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, 11f, centerPaint)
 
     return BitmapDrawable(context.resources, bitmap)
-
-    if (showStoryDialog) {
-        val topSpots = visits.groupBy { it.venueName }
-            .mapValues { it.value.size }
-            .toList()
-            .sortedByDescending { it.second }
-
-        val storyData = StorySummaryData(
-            season = selectedSeason,
-            totalVisits = visits.size,
-            totalSaved = currentSavings,
-            breakEvenReached = currentSavings >= 0,
-            topVenues = topSpots,
-            uniqueVenuesCount = topSpots.size
-        )
-
-        StoryShareDialog(
-            data = storyData,
-            onDismiss = { showStoryDialog = false }
-        )
-    }
 }

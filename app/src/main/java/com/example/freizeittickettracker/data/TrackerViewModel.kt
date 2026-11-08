@@ -241,7 +241,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveVisitWithPersons(visit: VisitEntity, personIds: List<Long>) {
         viewModelScope.launch {
-            val visitId = if (visit.id == 0L) {
+            val visitId: Long = if (visit.id == 0L) {
                 db.visitDao().insertVisit(visit)
             } else {
                 db.visitDao().updateVisit(visit)

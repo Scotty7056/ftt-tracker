@@ -10,11 +10,11 @@ object FamilyTarifEngine {
         val age = startYear - birthYear
 
         return when {
-            age <= 13 -> TarifCategory.KIND
-            age in 14..16 -> TarifCategory.JUGEND
+            age <= 13 -> TarifCategory.CHILD
+            age in 14..16 -> TarifCategory.YOUTH
             age in 17..21 -> TarifCategory.U23
-            age >= 65 -> TarifCategory.SENIOREN
-            else -> TarifCategory.ERWACHSENE
+            age >= 65 -> TarifCategory.SENIOR
+            else -> TarifCategory.ADULT
         }
     }
 
@@ -26,7 +26,7 @@ object FamilyTarifEngine {
         if (person.customTicketPrice != null) return person.customTicketPrice
 
         val cat = resolveCategory(person.birthYear, season)
-        if (person.isFamilyPackageApplied && cat == TarifCategory.KIND && childIndexInFamily >= 3) {
+        if (person.isFamilyPackageApplied && cat == TarifCategory.CHILD && childIndexInFamily >= 3) {
             return 0.0
         }
 
