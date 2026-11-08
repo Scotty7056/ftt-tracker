@@ -813,26 +813,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
     val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
     var selectedPersonFilterId by remember { mutableStateOf<Long?>(null) }
 
-    val displayVisits = remember(visits, crossRefs, selectedPersonFilterId) {
-        if (selectedPersonFilterId == null) {
-            visits
-        } else {
-            val matchingVisitIds = crossRefs.filter { it.personId == selectedPersonFilterId }.map { it.visitId }.toSet()
-            visits.filter { it.id in matchingVisitIds }
-        }
-    }
 
-    val selectedPerson = remember(allPersonsForFilter, selectedPersonFilterId) {
-        allPersonsForFilter.find { it.id == selectedPersonFilterId }
-    }
-
-    val effectiveTicketPrice = remember(selectedPerson, stats.purchasePrice, stats.season) {
-        if (selectedPerson != null) {
-            FamilyTarifEngine.calculateTicketPrice(selectedPerson, stats.season)
-        } else {
-            stats.purchasePrice
-        }
-    }
 
     val displayVisits = remember(visits, crossRefs, selectedPersonFilterId) {
         if (selectedPersonFilterId == null) {
