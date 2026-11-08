@@ -28,9 +28,35 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+                private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE visits ADD COLUMN season TEXT NOT NULL DEFAULT '2024/25'")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS persons (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        birthYear INTEGER NOT NULL,
+                        isEarlyBird INTEGER NOT NULL DEFAULT 1,
+                        customTicketPrice REAL,
+                        isDefaultSelected INTEGER NOT NULL DEFAULT 1,
+                        sortOrder INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS visit_person_cross_ref (
+                        visitId INTEGER NOT NULL,
+                        personId INTEGER NOT NULL,
+                        PRIMARY KEY(visitId, personId),
+                        FOREIGN KEY(visitId) REFERENCES visits(id) ON DELETE CASCADE,
+                        FOREIGN KEY(personId) REFERENCES persons(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_visit_person_cross_ref_personId ON visit_person_cross_ref(personId)")
             }
         }
 

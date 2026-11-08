@@ -1,5 +1,11 @@
 package com.example.freizeittickettracker.ui
 
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import com.example.freizeittickettracker.domain.FamilyTarifEngine
+
 import com.example.freizeittickettracker.ui.components.FamilyProfilesDialog
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -435,8 +441,10 @@ fun MainScreen(
 
         visitPendingEdit?.let { visit ->
             val allPersonsList by viewModel.allPersons.collectAsState(initial = emptyList())
-            val existingPersons by viewModel.getPersonsForVisit(visit.id).collectAsState(initial = emptyList())
-            val initialPersonIds = remember(existingPersons) { existingPersons.map { it.id } }
+            val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
+            val initialPersonIds = remember(crossRefs, visit.id) {
+                crossRefs.filter { it.visitId == visit.id }.map { it.personId }
+            }
 
             EditVisitDialog(
                 visit = visit,
@@ -739,10 +747,8 @@ fun DashboardView(
             }
         } else {
             items(displayVisits) { visit ->
-                val visitPersons by viewModel.getPersonsForVisit(visit.id).collectAsState(initial = emptyList())
-                    ModernVisitCard(
-                        visit = visit,
-                        persons = visitPersons,
+                
+                    ModernVisitCard(visit = visit,
                         onEdit = { onRequestEditVisit(visit) },
                         onDelete = { onRequestDeleteVisit(visit) }
                     )
@@ -1056,7 +1062,11 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                         OutlinedButton(
                             onClick = {
                                 coroutineScope.launch {
-                                    val csvData = AutoBackupManager.exportCsv(visits)
+                                    val personMap = allPersonsForFilter.associateBy { it.id }
+                                    val personsByVisit = crossRefs.groupBy { it.visitId }.mapValues { (_, refs) ->
+                                        refs.mapNotNull { personMap[it.personId]?.name }
+                                    }
+                                    val csvData = AutoBackupManager.exportCsv(visits, personsByVisit)
 pendingCsvContent = csvData
 val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
 csvExportLauncher.launch("ftt_visits_$timestamp.csv")
@@ -1238,10 +1248,8 @@ fun CalendarView(
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(selectedVisits) { visit ->
-                    val visitPersons by viewModel.getPersonsForVisit(visit.id).collectAsState(initial = emptyList())
-                    ModernVisitCard(
-                        visit = visit,
-                        persons = visitPersons,
+                    
+                    ModernVisitCard(visit = visit,
                         onEdit = { onRequestEditVisit(visit) },
                         onDelete = { onRequestDeleteVisit(visit) }
                     )
@@ -2350,7 +2358,7 @@ fun ManualVisitDialog(
                     } else {
                         val currentEffective = PriceSyncManager.getCustomPrice(context, selectedVenue.id, selectedVenue.normalTicketPrice)
                         val finalAmount = priceText.toDoubleOrNull() ?: currentEffective
-                        onConfirm(selectedVenue, selectedDate, finalAmount, notes)
+                        onConfirm(selectedVenue, selectedDate, finalAmount, notes, selectedPersonIds.toList())
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
@@ -2474,7 +2482,7 @@ fun EditVisitDialog(
             Button(
                 onClick = {
                     val finalAmount = editedPriceText.toDoubleOrNull() ?: visit.savedAmount
-                    onSave(editedDate, finalAmount, editedNotes)
+                    onSave(editedDate, finalAmount, editedNotes, selectedPersonIds.toList())
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
             ) {

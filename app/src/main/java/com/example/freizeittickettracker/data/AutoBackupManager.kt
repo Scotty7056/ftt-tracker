@@ -5,11 +5,16 @@ import java.io.File
 import java.time.LocalDate
 
 object AutoBackupManager {
-    fun exportCsv(visits: List<VisitEntity>): String {
+    fun exportCsv(
+        visits: List<VisitEntity>,
+        personsByVisitId: Map<Long, List<String>> = emptyMap()
+    ): String {
         val sb = StringBuilder()
-        sb.append("Datum;Gebiet;Kategorie;Ersparnis;Saison;Notizen\n")
+        sb.append("Datum;Gebiet;Kategorie;Ersparnis;Saison;Notizen;Teilnehmer\n")
         for (v in visits) {
-            sb.append("${v.date};${v.venueName};${v.category};${v.savedAmount};${v.season};${v.notes}\n")
+            val participantNames = personsByVisitId[v.id]?.joinToString(", ") ?: ""
+            val cleanNotes = v.notes.replace(";", ",")
+            sb.append("${v.date};${v.venueName};${v.category};${v.savedAmount};${v.season};$cleanNotes;$participantNames\n")
         }
         return sb.toString()
     }

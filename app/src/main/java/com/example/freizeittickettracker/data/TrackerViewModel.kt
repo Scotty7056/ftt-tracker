@@ -5,6 +5,8 @@ import com.example.freizeittickettracker.data.model.VisitPersonCrossRef
 import com.example.freizeittickettracker.domain.FamilyTarifEngine
 
 import android.app.Application
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -53,9 +55,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     val ticketConfig: Flow<TicketConfig> = repository.ticketConfigFlow
 
-        val allPersons = db.personDao().getAllPersons()
-    val allCrossRefs = db.personDao().getAllCrossRefsFlow()
-    val allVisits: Flow<List<VisitEntity>> = repository.allVisits
+        val allVisits: Flow<List<VisitEntity>> = repository.allVisits
 
     val availableSeasons: StateFlow<List<String>> = repository.allVisits
         .map { visits ->
@@ -217,8 +217,8 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     // --- Familien- und Mehrpersonen-Verwaltung ---
     private val db = AppDatabase.getDatabase(application)
-    val allPersons = db.personDao().getAllPersons()
-
+    val allPersons: Flow<List<PersonProfile>> = db.personDao().getAllPersons()
+    val allCrossRefs: Flow<List<VisitPersonCrossRef>> = db.personDao().getAllCrossRefsFlow()
     fun addPerson(name: String, birthYear: Int, isEarlyBird: Boolean = true, customPrice: Double? = null) {
         viewModelScope.launch {
             val p = PersonProfile(
