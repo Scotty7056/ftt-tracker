@@ -269,13 +269,13 @@ fun MainScreen(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(end = 8.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            "\uD83C\uDFBF FTT Tracker",
+                            "🎿 FTT Tracker",
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            fontSize = 17.sp,
+                            fontSize = 16.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -289,10 +289,10 @@ fun MainScreen(
                                     contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text(selectedSeason, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text(selectedSeason, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(14.dp))
                             }
                             DropdownMenu(expanded = expandedSeason, onDismissRequest = { expandedSeason = false }) {
                                 availableSeasons.forEach { s ->
@@ -306,7 +306,7 @@ fun MainScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         FilledTonalButton(
                             onClick = { showTarifDialog = true },
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -314,22 +314,22 @@ fun MainScreen(
                                 contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(14.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Icon(Icons.Rounded.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tarif", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Rounded.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Tarif", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 },
                 actions = {
                     IconButton(
                         onClick = { showFamilyDialog = true },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             Icons.Rounded.Settings,
-                            contentDescription = "Einstellungen & Daten",
+                            contentDescription = "Einstellungen",
                             tint = Color.White,
                             modifier = Modifier.size(22.dp)
                         )
