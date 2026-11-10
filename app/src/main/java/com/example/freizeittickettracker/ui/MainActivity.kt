@@ -832,6 +832,124 @@ fun DashboardView(
 // 2. STATISTIKEN, EXPORT & IMPORT
 // ==========================================
 @Composable
+fun generateStoryShareImage(
+    context: android.content.Context,
+    season: String,
+    personName: String,
+    visitsCount: Int,
+    savedAmount: Double,
+    ticketPrice: Double
+): android.net.Uri? {
+    return try {
+        val width = 1080
+        val height = 1920
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+
+        // Dunkler moderner Alpin-Verlauf
+        val bgPaint = Paint().apply {
+            shader = LinearGradient(
+                0f, 0f, width.toFloat(), height.toFloat(),
+                android.graphics.Color.parseColor("#0F172A"),
+                android.graphics.Color.parseColor("#1E293B"),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+        // Header
+        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#38BDF8")
+            textSize = 42f
+            isFakeBoldText = true
+            letterSpacing = 0.1f
+        }
+        canvas.drawText("FREIZEITTICKET TRACKER", 100f, 220f, brandPaint)
+
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 76f
+            isFakeBoldText = true
+        }
+        canvas.drawText("Saison-Rückblick", 100f, 320f, titlePaint)
+
+        val seasonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#94A3B8")
+            textSize = 46f
+        }
+        val personLabel = if (personName.isNotBlank()) " • $personName" else ""
+        canvas.drawText("Saison $season$personLabel", 100f, 390f, seasonPaint)
+
+        // Hauptkarte: Eingefahrener Wert
+        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#1E293B")
+        }
+        val cardBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#334155")
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        val cardRect = RectF(100f, 480f, 980f, 920f)
+        canvas.drawRoundRect(cardRect, 40f, 40f, cardPaint)
+        canvas.drawRoundRect(cardRect, 40f, 40f, cardBorder)
+
+        val cardLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#94A3B8")
+            textSize = 34f
+            isFakeBoldText = true
+            letterSpacing = 0.08f
+        }
+        canvas.drawText("EINGEFAHRENER WERT", 160f, 580f, cardLabelPaint)
+
+        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 100f
+            isFakeBoldText = true
+        }
+        canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), 160f, 700f, valuePaint)
+
+        val isAmortized = savedAmount >= ticketPrice && ticketPrice > 0
+        val statusText = if (isAmortized) {
+            String.format(java.util.Locale.GERMAN, "🎉 Break-Even erreicht (+%.2f €)", (savedAmount - ticketPrice))
+        } else {
+            String.format(java.util.Locale.GERMAN, "Noch %.2f € bis zum Break-Even", (ticketPrice - savedAmount).coerceAtLeast(0.0))
+        }
+        val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isAmortized) android.graphics.Color.parseColor("#34D399") else android.graphics.Color.parseColor("#38BDF8")
+            textSize = 36f
+            isFakeBoldText = true
+        }
+        canvas.drawText(statusText, 160f, 820f, statusPaint)
+
+        // Kachel: Ausflüge
+        val statCardRect = RectF(100f, 980f, 980f, 1260f)
+        canvas.drawRoundRect(statCardRect, 36f, 36f, cardPaint)
+        canvas.drawRoundRect(statCardRect, 36f, 36f, cardBorder)
+
+        canvas.drawText("ABSOLVIERTE AUSFLÜGE", 160f, 1070f, cardLabelPaint)
+        canvas.drawText("$visitsCount Aktivitäten", 160f, 1170f, valuePaint)
+
+        // Footer-Branding
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#64748B")
+            textSize = 32f
+        }
+        canvas.drawText("Getrackt mit dem FTT Tracker für Android", 100f, 1800f, footerPaint)
+
+        // Speichern im App-Cache & Bereitstellen über FileProvider
+        val cachePath = File(context.cacheDir, "images").apply { mkdirs() }
+        val file = File(cachePath, "ftt_story_share.png")
+        val stream = FileOutputStream(file)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        stream.close()
+
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    } catch (e: Exception) {
+        android.util.Log.e("FTT_SHARE", "Fehler bei Story-Grafik", e)
+        null
+    }
+}
+
 fun StatisticsView(viewModel: TrackerViewModel) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
@@ -942,6 +1060,39 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (allPersonsForFilter.isNotEmpty()) {
+            item {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedPersonFilterId == null,
+                            onClick = { selectedPersonFilterId = null },
+                            label = { Text("Alle Personen", fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GlacierBlue,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                    items(allPersonsForFilter) { person ->
+                        FilterChip(
+                            selected = selectedPersonFilterId == person.id,
+                            onClick = { selectedPersonFilterId = person.id },
+                            label = { Text(person.name, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GlacierBlue,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -957,17 +1108,35 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                         }
                         IconButton(
                             onClick = {
-                                val shareText = "⛷️ Mein FTT Saison-Rückblick ${stats.season}:\n" +
-                                        "• ${stats.totalVisits} Ausflüge absolviert\n" +
-                                        "• ${stats.totalValueSaved.formatEuro()} Wert eingefahren\n" +
+                                val pName = selectedPerson?.name ?: ""
+                                val imageUri = generateStoryShareImage(
+                                    context = context,
+                                    season = stats.season,
+                                    personName = pName,
+                                    visitsCount = displayVisits.size,
+                                    savedAmount = effectiveSavedAmount,
+                                    ticketPrice = effectiveTicketPrice
+                                )
+
+                                val shareText = "🎿 Mein FTT Saison-Rückblick ${stats.season}${if (pName.isNotBlank()) " ($pName)" else ""}:\n" +
+                                        "• ${displayVisits.size} Ausflüge absolviert\n" +
+                                        "• ${effectiveSavedAmount.formatEuro()} Wert eingefahren\n" +
                                         (if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) "• 🎉 Amortisiert mit +${effectiveNetGain.formatEuro()} Reingewinn!\n" else "• ${effectiveRemaining.formatEuro()} noch bis zum Break-Even\n") +
                                         "Getrackt mit dem FTT Tracker für Android."
+
                                 val sendIntent = Intent().apply {
                                     action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                    type = "text/plain"
+                                    if (imageUri != null) {
+                                        putExtra(Intent.EXTRA_STREAM, imageUri)
+                                        putExtra(Intent.EXTRA_TEXT, shareText)
+                                        type = "image/png"
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    } else {
+                                        putExtra(Intent.EXTRA_TEXT, shareText)
+                                        type = "text/plain"
+                                    }
                                 }
-                                context.startActivity(Intent.createChooser(sendIntent, "Saison teilen"))
+                                context.startActivity(Intent.createChooser(sendIntent, "Saison teilen (WhatsApp / Instagram)"))
                             },
                             modifier = Modifier.clip(CircleShape).background(GlacierBlue.copy(alpha = 0.1f)).size(40.dp)
                         ) {
