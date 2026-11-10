@@ -626,7 +626,7 @@ fun DashboardView(
                     modifier = Modifier
                         .background(
                             Brush.linearGradient(
-                                colors = if (stats.isAmortized) listOf(Color(0xFF0F3E2E), EmeraldGain)
+                                colors = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) listOf(Color(0xFF0F3E2E), EmeraldGain)
                                 else listOf(AlpineDark, AlpineNavy, GlacierBlue)
                             )
                         )
@@ -674,11 +674,11 @@ fun DashboardView(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("EINGEFAHRENER WERT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.75f), letterSpacing = 1.sp)
-                                Text(stats.totalValueSaved.formatEuro(), fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White, softWrap = false)
+                                Text(effectiveSavedAmount.formatEuro(), fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White, softWrap = false)
                             }
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (stats.isAmortized) EmeraldGain else Color.White.copy(alpha = 0.2f)
+                                color = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) EmeraldGain else Color.White.copy(alpha = 0.2f)
                             ) {
                                 Text(
                                     "${(stats.amortizationProgress * 100).toInt()}%",
@@ -695,7 +695,7 @@ fun DashboardView(
                         LinearProgressIndicator(
                             progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                            color = if (stats.isAmortized) EmeraldGain else FrostTeal,
+                            color = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) EmeraldGain else FrostTeal,
                             trackColor = Color.White.copy(alpha = 0.25f)
                         )
 
@@ -703,17 +703,17 @@ fun DashboardView(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(
-                                if (stats.isAmortized) "🎉 Ticket amortisiert!" else "Noch offen zum Break-Even:",
+                                if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) "🎉 Ticket amortisiert!" else "Noch offen zum Break-Even:",
                                 fontSize = 13.sp,
                                 color = Color.White.copy(alpha = 0.85f),
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                if (stats.isAmortized) "+${stats.netSavings.formatEuro()} Plus" else stats.remainingToAmortize.formatEuro(),
+                                if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) "+${effectiveNetGain.formatEuro()} Plus" else effectiveRemaining.formatEuro(),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
-                                color = if (stats.isAmortized) EmeraldGain else Color(0xFFFFD166),
+                                color = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) EmeraldGain else Color(0xFFFFD166),
                                 softWrap = false
                             )
                         }
@@ -726,8 +726,8 @@ fun DashboardView(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricTile("aktivit\u00E4ten", stats.totalVisits.toString(), Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
                 val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
-                val (rightTitle, rightValue) = if (stats.isAmortized) {
-                    "Reingewinn" to ("+" + stats.netSavings.formatEuro())
+                val (rightTitle, rightValue) = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) {
+                    "Reingewinn" to ("+" + effectiveNetGain.formatEuro())
                 } else {
                     val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
                     "Noch n\u00F6tig" to ("ca. " + needed + "x")
@@ -960,7 +960,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                                 val shareText = "⛷️ Mein FTT Saison-Rückblick ${stats.season}:\n" +
                                         "• ${stats.totalVisits} Ausflüge absolviert\n" +
                                         "• ${stats.totalValueSaved.formatEuro()} Wert eingefahren\n" +
-                                        (if (stats.isAmortized) "• 🎉 Amortisiert mit +${stats.netSavings.formatEuro()} Reingewinn!\n" else "• ${stats.remainingToAmortize.formatEuro()} noch bis zum Break-Even\n") +
+                                        (if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) "• 🎉 Amortisiert mit +${effectiveNetGain.formatEuro()} Reingewinn!\n" else "• ${effectiveRemaining.formatEuro()} noch bis zum Break-Even\n") +
                                         "Getrackt mit dem FTT Tracker für Android."
                                 val sendIntent = Intent().apply {
                                     action = Intent.ACTION_SEND
