@@ -12,7 +12,7 @@ interface VisitDao {
     suspend fun getAllVisitsList(): List<VisitEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertVisit(visit: VisitEntity)
+    suspend fun insertVisit(visit: VisitEntity): Long
 
     @Update
     suspend fun updateVisit(visit: VisitEntity)

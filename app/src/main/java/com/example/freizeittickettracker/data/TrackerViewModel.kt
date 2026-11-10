@@ -242,14 +242,15 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveVisitWithPersons(visit: VisitEntity, personIds: List<Long>) {
         viewModelScope.launch {
-            if (visit.id == 0L) {
+            val targetVisitId = if (visit.id == 0L) {
                 db.visitDao().insertVisit(visit)
             } else {
                 db.visitDao().updateVisit(visit)
-                db.personDao().deleteCrossRefsForVisit(visit.id)
-                personIds.forEach { pId ->
-                    db.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(visit.id, pId))
-                }
+                visit.id
+            }
+            db.personDao().deleteCrossRefsForVisit(targetVisitId)
+            personIds.forEach { pId ->
+                db.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(targetVisitId, pId))
             }
         }
     }    fun restoreVisits(visits: List<VisitEntity>, onComplete: (Int) -> Unit) {
