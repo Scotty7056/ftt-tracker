@@ -323,7 +323,6 @@ fun MainScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                         FilledTonalButton(
                             onClick = {
-                                android.widget.Toast.makeText(context, "Öffne Einstellungen...", android.widget.Toast.LENGTH_SHORT).show()
                                 showFamilyDialog = true
                             },
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -425,6 +424,17 @@ fun MainScreen(
                     viewModel.saveTicketConfig(newConfig, selectedSeason)
                     showTarifDialog = false
                 }
+            )
+        }
+
+        if (showFamilyDialog) {
+            val personsList by viewModel.allPersons.collectAsState(initial = emptyList())
+            val currentSeason by viewModel.selectedSeason.collectAsState(initial = "2025/2026")
+            FamilySettingsDialog(
+                viewModel = viewModel,
+                persons = personsList,
+                season = currentSeason,
+                onDismiss = { showFamilyDialog = false }
             )
         }
 
