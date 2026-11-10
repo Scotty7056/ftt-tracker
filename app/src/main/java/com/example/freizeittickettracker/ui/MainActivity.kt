@@ -753,9 +753,42 @@ fun DashboardView(
         }
 
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("aktivit\u00E4ten Saison ${stats.season}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
-                if (visits.isNotEmpty()) Text("✏️ ändern • 🗑️ l\u00F6schen", fontSize = 12.sp, color = Color.Gray)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Aktivitäten",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlpineDark
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = GlacierBlue.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "${displayVisits.size}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlacierBlue,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = "Saison ${stats.season}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Gray
+                )
             }
         }
 
