@@ -322,13 +322,11 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            showFamilyDialog = true
-                        },
+                    Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .padding(end = 4.dp)
+                            .clickable { showFamilyDialog = true },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Rounded.Settings,
