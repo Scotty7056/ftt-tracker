@@ -1073,10 +1073,10 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                                     val personsByVisit = crossRefs.groupBy { it.visitId }.mapValues { (_, refs) ->
                                         refs.mapNotNull { personMap[it.personId]?.name }
                                     }
-                                    val csvData = AutoBackupManager.exportCsv(visits, personsByVisit)
+                                    val csvData = AutoBackupManager.exportCsv(displayVisits, personsByVisit)
 pendingCsvContent = csvData
 val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-csvExportLauncher.launch("ftt_visits_$timestamp.csv")
+csvExportLauncher.launch("ftt_visits_${selectedPerson?.name?.let { "${it}_" } ?: ""}$timestamp.csv")
                                 }
                             },
                             shape = RoundedCornerShape(12.dp),
@@ -2869,10 +2869,10 @@ fun FamilySettingsDialog(
                             val personsByVisit = crossRefs.groupBy { it.visitId }.mapValues { (_, refs) ->
                                 refs.mapNotNull { personMap[it.personId]?.name }
                             }
-                            val csvData = AutoBackupManager.exportCsv(visits, personsByVisit)
+                            val csvData = AutoBackupManager.exportCsv(displayVisits, personsByVisit)
                             pendingCsvContent = csvData
                             val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-                            csvExportLauncher.launch("ftt_visits_$timestamp.csv")
+                            csvExportLauncher.launch("ftt_visits_${selectedPerson?.name?.let { "${it}_" } ?: ""}$timestamp.csv")
                         },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.weight(1f),
