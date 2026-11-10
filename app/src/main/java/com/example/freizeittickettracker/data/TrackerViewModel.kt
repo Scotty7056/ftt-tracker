@@ -25,6 +25,27 @@ fun getSeasonForDate(date: LocalDate): String {
 }
 
 class TrackerViewModel(application: Application) : AndroidViewModel(application) {
+    private val db = AppDatabase.getDatabase(application)
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val persons = db.personDao().getAllPersonsSync()
+                if (persons.isNotEmpty()) {
+                    val defaultPersonId = persons.find { it.isDefaultSelected }?.id ?: persons.first().id
+                    val existingCrossRefs = db.personDao().getAllCrossRefsSync()
+                    val linkedVisitIds = existingCrossRefs.map { it.visitId }.toSet()
+                    val allVisitsList = db.visitDao().getAllVisitsSync()
+                    val unlinkedVisits = allVisitsList.filter { it.id !in linkedVisitIds }
+                    unlinkedVisits.forEach { uv ->
+                        db.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(uv.id, defaultPersonId))
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FTT_MIGRATION", "Migration error", e)
+            }
+        }
+    }
     private val repository: TrackerRepository
 
     private val _currentLocation = MutableStateFlow<Location?>(null)
@@ -35,19 +56,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     private val _selectedSeason = MutableStateFlow(getSeasonForDate(LocalDate.now()))
     val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
 
-    init {
-        viewModelScope.launch(Dispatchers.IO) {
-            val persons = db.personDao().getAllPersonsSync()
-            if (persons.isNotEmpty()) {
-                val defaultPersonId = persons.find { it.isDefaultSelected }?.id ?: persons.first().id
-                val existingCrossRefs = db.personDao().getAllCrossRefsSync()
-                val linkedVisitIds = existingCrossRefs.map { it.visitId }.toSet()
-                val allVisitsList = db.visitDao().getAllVisitsSync()
-                val unlinkedVisits = allVisitsList.filter { it.id !in linkedVisitIds }
-                unlinkedVisits.forEach { uv ->
-                    db.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(uv.id, defaultPersonId))
-                }
-            }
+    
         }
         val db = AppDatabase.getDatabase(application)
         repository = TrackerRepository(db.visitDao(), db.ticketConfigDao())
@@ -228,7 +237,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // --- Familien- und Mehrpersonen-Verwaltung ---
-    private val db = AppDatabase.getDatabase(application)
+    
     val allPersons: Flow<List<PersonProfile>> = db.personDao().getAllPersons()
     val allCrossRefs: Flow<List<VisitPersonCrossRef>> = db.personDao().getAllCrossRefsFlow()
     fun addPerson(name: String, birthYear: Int, isEarlyBird: Boolean = true, customPrice: Double? = null) {
