@@ -1,14 +1,7 @@
 package com.example.freizeittickettracker.ui
 
 
-import android.graphics.Bitmap
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.LinearGradient
-import android.graphics.Shader
-import androidx.core.content.FileProvider
-import java.io.File
-import java.io.FileOutputStream
+
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
@@ -852,22 +845,20 @@ fun generateStoryShareImage(
     return try {
         val width = 1080
         val height = 1920
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)
 
-        // Dunkler moderner Alpin-Verlauf
-        val bgPaint = Paint().apply {
-            shader = LinearGradient(
+        val bgPaint = android.graphics.Paint().apply {
+            shader = android.graphics.LinearGradient(
                 0f, 0f, width.toFloat(), height.toFloat(),
                 android.graphics.Color.parseColor("#0F172A"),
                 android.graphics.Color.parseColor("#1E293B"),
-                Shader.TileMode.CLAMP
+                android.graphics.Shader.TileMode.CLAMP
             )
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
-        // Header
-        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val brandPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#38BDF8")
             textSize = 42f
             isFakeBoldText = true
@@ -875,34 +866,33 @@ fun generateStoryShareImage(
         }
         canvas.drawText("FREIZEITTICKET TRACKER", 100f, 220f, brandPaint)
 
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val titlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.WHITE
             textSize = 76f
             isFakeBoldText = true
         }
         canvas.drawText("Saison-Rückblick", 100f, 320f, titlePaint)
 
-        val seasonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val seasonPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#94A3B8")
             textSize = 46f
         }
         val personLabel = if (personName.isNotBlank()) " • $personName" else ""
         canvas.drawText("Saison $season$personLabel", 100f, 390f, seasonPaint)
 
-        // Hauptkarte: Eingefahrener Wert
-        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val cardPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#1E293B")
         }
-        val cardBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val cardBorder = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#334155")
-            style = Paint.Style.STROKE
+            style = android.graphics.Paint.Style.STROKE
             strokeWidth = 3f
         }
-        val cardRect = RectF(100f, 480f, 980f, 920f)
+        val cardRect = android.graphics.RectF(100f, 480f, 980f, 920f)
         canvas.drawRoundRect(cardRect, 40f, 40f, cardPaint)
         canvas.drawRoundRect(cardRect, 40f, 40f, cardBorder)
 
-        val cardLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val cardLabelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#94A3B8")
             textSize = 34f
             isFakeBoldText = true
@@ -910,7 +900,7 @@ fun generateStoryShareImage(
         }
         canvas.drawText("EINGEFAHRENER WERT", 160f, 580f, cardLabelPaint)
 
-        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val valuePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.WHITE
             textSize = 100f
             isFakeBoldText = true
@@ -923,36 +913,33 @@ fun generateStoryShareImage(
         } else {
             String.format(java.util.Locale.GERMAN, "Noch %.2f € bis zum Break-Even", (ticketPrice - savedAmount).coerceAtLeast(0.0))
         }
-        val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val statusPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = if (isAmortized) android.graphics.Color.parseColor("#34D399") else android.graphics.Color.parseColor("#38BDF8")
             textSize = 36f
             isFakeBoldText = true
         }
         canvas.drawText(statusText, 160f, 820f, statusPaint)
 
-        // Kachel: Ausflüge
-        val statCardRect = RectF(100f, 980f, 980f, 1260f)
+        val statCardRect = android.graphics.RectF(100f, 980f, 980f, 1260f)
         canvas.drawRoundRect(statCardRect, 36f, 36f, cardPaint)
         canvas.drawRoundRect(statCardRect, 36f, 36f, cardBorder)
 
         canvas.drawText("ABSOLVIERTE AUSFLÜGE", 160f, 1070f, cardLabelPaint)
         canvas.drawText("$visitsCount Aktivitäten", 160f, 1170f, valuePaint)
 
-        // Footer-Branding
-        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val footerPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.parseColor("#64748B")
             textSize = 32f
         }
         canvas.drawText("Getrackt mit dem FTT Tracker für Android", 100f, 1800f, footerPaint)
 
-        // Speichern im App-Cache & Bereitstellen über FileProvider
-        val cachePath = File(context.cacheDir, "images").apply { mkdirs() }
-        val file = File(cachePath, "ftt_story_share.png")
-        val stream = FileOutputStream(file)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        val cachePath = java.io.File(context.cacheDir, "images").apply { mkdirs() }
+        val file = java.io.File(cachePath, "ftt_story_share.png")
+        val stream = java.io.FileOutputStream(file)
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
         stream.close()
 
-        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     } catch (e: Exception) {
         android.util.Log.e("FTT_SHARE", "Fehler bei Story-Grafik", e)
         null
@@ -961,6 +948,7 @@ fun generateStoryShareImage(
 
 @Composable
 fun StatisticsView(viewModel: TrackerViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
     val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
