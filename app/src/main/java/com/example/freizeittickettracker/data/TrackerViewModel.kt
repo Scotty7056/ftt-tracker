@@ -26,10 +26,29 @@ fun getSeasonForDate(date: LocalDate): String {
 
 class TrackerViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
+    private val repository = TrackerRepository(db.visitDao(), db.ticketConfigDao())
+
+    private val _currentLocation = MutableStateFlow<Location?>(null)
+    val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
+
+    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
+
+    private val _selectedSeason = MutableStateFlow(getSeasonForDate(LocalDate.now()))
+    val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // 1. Saison-Zuordnungen korrigieren
+                val allList = db.visitDao().getAllVisitsList()
+                for (v in allList) {
+                    val correctSeason = getSeasonForDate(v.date)
+                    if (v.season != correctSeason) {
+                        db.visitDao().updateVisit(v.copy(season = correctSeason))
+                    }
+                }
+
+                // 2. Unzugeordnete Alt-Besuche mit dem Hauptprofil verknüpfen
                 val persons = db.personDao().getAllPersonsSync()
                 if (persons.isNotEmpty()) {
                     val defaultPersonId = persons.find { it.isDefaultSelected }?.id ?: persons.first().id
@@ -42,35 +61,8 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("FTT_MIGRATION", "Migration error", e)
+                android.util.Log.e("FTT_INIT", "Initialization/Migration error", e)
             }
-        }
-    }
-    private val repository: TrackerRepository
-
-    private val _currentLocation = MutableStateFlow<Location?>(null)
-    val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
-
-    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
-
-    private val _selectedSeason = MutableStateFlow(getSeasonForDate(LocalDate.now()))
-    val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
-
-    
-        }
-        val db = AppDatabase.getDatabase(application)
-        repository = TrackerRepository(db.visitDao(), db.ticketConfigDao())
-
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val allList = db.visitDao().getAllVisitsList()
-                for (v in allList) {
-                    val correctSeason = getSeasonForDate(v.date)
-                    if (v.season != correctSeason) {
-                        db.visitDao().updateVisit(v.copy(season = correctSeason))
-                    }
-                }
-            } catch (_: Exception) {}
         }
     }
 
