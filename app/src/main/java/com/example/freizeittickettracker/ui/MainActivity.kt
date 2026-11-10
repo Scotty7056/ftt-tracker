@@ -2303,7 +2303,7 @@ fun EditVisitDialog(
                         editedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
                     }
                     showDatePicker = false
-                }) { Text("Übernehmen") }
+                }) { Text("Übernehmen", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") }
@@ -2316,19 +2316,40 @@ fun EditVisitDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Column {
-                Text(
-                    text = visit.venueName,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlpineDark
-                )
-                Text(
-                    text = "Eintrag anpassen",
-                    fontSize = 13.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(GlacierBlue.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        tint = GlacierBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = visit.venueName,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlpineDark,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "Eintrag anpassen",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         },
         text = {
@@ -2336,16 +2357,16 @@ fun EditVisitDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Schlankes, modernes Datumsfeld ohne Saison-Redundanz
+                // Schlanke Datumskachel in Kurzform
                 Surface(
                     onClick = { showDatePicker = true },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.Black.copy(alpha = 0.04f),
-                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.10f)),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.Black.copy(alpha = 0.03f),
+                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -2354,14 +2375,27 @@ fun EditVisitDialog(
                             tint = GlacierBlue,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = editedDate.format(DateTimeFormatter.ofPattern("EEE, dd. MMMM yyyy", Locale.GERMAN)),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlpineDark,
-                            modifier = Modifier.weight(1f)
+                            text = "Datum",
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Medium
                         )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = GlacierBlue.copy(alpha = 0.1f)
+                        ) {
+                            Text(
+                                text = editedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GlacierBlue,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             imageVector = Icons.Rounded.ChevronRight,
                             contentDescription = null,
@@ -2373,20 +2407,28 @@ fun EditVisitDialog(
 
                 // Personen-Auswahl
                 if (allPersons.isNotEmpty()) {
-                    FamilyCheckInSelector(
-                        allPersons = allPersons,
-                        selectedPersonIds = selectedPersonIds,
-                        onTogglePerson = { pId ->
-                            selectedPersonIds = if (selectedPersonIds.contains(pId)) {
-                                selectedPersonIds - pId
-                            } else {
-                                selectedPersonIds + pId
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Wer war dabei?",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AlpineDark
+                        )
+                        FamilyCheckInSelector(
+                            allPersons = allPersons,
+                            selectedPersonIds = selectedPersonIds,
+                            onTogglePerson = { pId ->
+                                selectedPersonIds = if (selectedPersonIds.contains(pId)) {
+                                    selectedPersonIds - pId
+                                } else {
+                                    selectedPersonIds + pId
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
 
-                // Angerechneter Tarif
+                // Tarif & Notiz
                 OutlinedTextField(
                     value = editedPriceText,
                     onValueChange = { input ->
@@ -2395,7 +2437,7 @@ fun EditVisitDialog(
                             editedPriceText = sanitized
                         }
                     },
-                    label = { Text("Angerechneter Tarif (€)") },
+                    label = { Text("Angerechneter Tarif") },
                     shape = RoundedCornerShape(12.dp),
                     trailingIcon = {
                         Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue)
@@ -2404,7 +2446,6 @@ fun EditVisitDialog(
                     singleLine = true
                 )
 
-                // Schlankes Notizfeld
                 OutlinedTextField(
                     value = editedNotes,
                     onValueChange = { editedNotes = it },
@@ -2422,14 +2463,18 @@ fun EditVisitDialog(
                     onSave(editedDate, finalAmount, editedNotes, selectedPersonIds.toList())
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
             ) {
                 Text("Speichern", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Abbrechen", color = Color.Gray)
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Abbrechen", color = Color.Gray, fontWeight = FontWeight.Medium)
             }
         }
     )
