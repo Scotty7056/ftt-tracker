@@ -981,7 +981,7 @@ fun generateStoryShareImage(
 
 @Composable
 fun StatisticsView(viewModel: TrackerViewModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
     val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
