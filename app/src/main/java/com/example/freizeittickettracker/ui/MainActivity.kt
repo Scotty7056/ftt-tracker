@@ -268,8 +268,7 @@ fun MainScreen(
             TopAppBar(
                 title = {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             "🎿 FTT Tracker",
@@ -277,9 +276,9 @@ fun MainScreen(
                             color = Color.White,
                             fontSize = 16.sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
                         var expandedSeason by remember { mutableStateOf(false) }
                         Box {
                             FilledTonalButton(
@@ -324,14 +323,18 @@ fun MainScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { showFamilyDialog = true },
-                        modifier = Modifier.size(40.dp)
+                        onClick = {
+                            showFamilyDialog = true
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(end = 4.dp)
                     ) {
                         Icon(
                             Icons.Rounded.Settings,
                             contentDescription = "Einstellungen",
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 },
