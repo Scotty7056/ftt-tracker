@@ -1141,7 +1141,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             onClick = {
                                 val pName = selectedPerson?.name ?: ""
                                 val imageUri = generateStoryShareImage(
-                                    context = context,
+                                    context = context.applicationContext,
                                     season = stats.season,
                                     personName = pName,
                                     visitsCount = displayVisits.size,
