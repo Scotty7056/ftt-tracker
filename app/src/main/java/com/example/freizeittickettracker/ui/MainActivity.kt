@@ -1,5 +1,14 @@
 package com.example.freizeittickettracker.ui
 
+
+import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
@@ -950,6 +959,7 @@ fun generateStoryShareImage(
     }
 }
 
+@Composable
 fun StatisticsView(viewModel: TrackerViewModel) {
     val stats by viewModel.dashboardStats.collectAsState(initial = DashboardStats())
     val visits by viewModel.seasonVisits.collectAsState(initial = emptyList())
