@@ -268,7 +268,8 @@ fun MainScreen(
             TopAppBar(
                 title = {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(end = 4.dp)
                     ) {
                         Text(
                             "🎿 FTT Tracker",
@@ -276,9 +277,9 @@ fun MainScreen(
                             color = Color.White,
                             fontSize = 16.sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         var expandedSeason by remember { mutableStateOf(false) }
                         Box {
                             FilledTonalButton(
@@ -319,21 +320,21 @@ fun MainScreen(
                             Spacer(modifier = Modifier.width(3.dp))
                             Text("Tarif", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
-                    }
-                },
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clickable { showFamilyDialog = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.Settings,
-                            contentDescription = "Einstellungen",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        FilledTonalButton(
+                            onClick = {
+                                android.widget.Toast.makeText(context, "Öffne Einstellungen...", android.widget.Toast.LENGTH_SHORT).show()
+                                showFamilyDialog = true
+                            },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.22f),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Rounded.Settings, contentDescription = "Einstellungen", modifier = Modifier.size(15.dp))
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AlpineNavy)
