@@ -2343,6 +2343,21 @@ fun EditVisitDialog(
                     }
                 }
 
+                if (allPersons.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FamilyCheckInSelector(
+                        allPersons = allPersons,
+                        selectedPersonIds = selectedPersonIds,
+                        onTogglePerson = { pId ->
+                            selectedPersonIds = if (selectedPersonIds.contains(pId)) {
+                                selectedPersonIds - pId
+                            } else {
+                                selectedPersonIds + pId
+                            }
+                        }
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedTextField(

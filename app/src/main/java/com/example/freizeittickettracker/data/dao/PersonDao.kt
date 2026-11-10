@@ -7,6 +7,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PersonDao {
+    @Query("SELECT * FROM persons")
+    fun getAllPersonsSync(): List<PersonProfile>
+
+    @Query("SELECT * FROM visit_person_cross_ref")
+    fun getAllCrossRefsSync(): List<VisitPersonCrossRef>
+
     @Query("SELECT * FROM persons ORDER BY sortOrder ASC, id ASC")
     fun getAllPersons(): Flow<List<PersonProfile>>
 

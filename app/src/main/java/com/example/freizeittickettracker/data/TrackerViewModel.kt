@@ -36,6 +36,19 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val selectedSeason: StateFlow<String> = _selectedSeason.asStateFlow()
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val persons = db.personDao().getAllPersonsSync()
+            if (persons.isNotEmpty()) {
+                val defaultPersonId = persons.find { it.isDefaultSelected }?.id ?: persons.first().id
+                val existingCrossRefs = db.personDao().getAllCrossRefsSync()
+                val linkedVisitIds = existingCrossRefs.map { it.visitId }.toSet()
+                val allVisitsList = db.visitDao().getAllVisitsSync()
+                val unlinkedVisits = allVisitsList.filter { it.id !in linkedVisitIds }
+                unlinkedVisits.forEach { uv ->
+                    db.personDao().insertVisitPersonCrossRef(VisitPersonCrossRef(uv.id, defaultPersonId))
+                }
+            }
+        }
         val db = AppDatabase.getDatabase(application)
         repository = TrackerRepository(db.visitDao(), db.ticketConfigDao())
 

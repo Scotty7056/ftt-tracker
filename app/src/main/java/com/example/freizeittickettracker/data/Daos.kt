@@ -5,6 +5,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface VisitDao {
+    @Query("SELECT * FROM visits")
+    fun getAllVisitsSync(): List<VisitEntity>
+
     @Query("SELECT * FROM visits ORDER BY date DESC")
     fun getAllVisits(): Flow<List<VisitEntity>>
 
