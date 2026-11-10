@@ -2291,10 +2291,6 @@ fun EditVisitDialog(
         mutableStateOf(initialPersonIds.toSet())
     }
 
-    val defaultVenuePrice = remember(visit.venueId) {
-        VenueCatalog.findById(visit.venueId)?.normalTicketPrice
-    }
-
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = editedDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
@@ -2321,30 +2317,62 @@ fun EditVisitDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text("Eintrag & Tarif anpassen", fontWeight = FontWeight.Bold, color = AlpineDark)
-                Text(visit.venueName, fontSize = 13.sp, color = GlacierBlue, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = visit.venueName,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlpineDark
+                )
+                Text(
+                    text = "Eintrag anpassen",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Medium
+                )
             }
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedCard(
-                    modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
-                    shape = RoundedCornerShape(12.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Schlankes, modernes Datumsfeld ohne Saison-Redundanz
+                Surface(
+                    onClick = { showDatePicker = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.04f),
+                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.10f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(22.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Besuchsdatum", fontSize = 11.sp, color = Color.Gray)
-                            Text(editedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
-                            Text("Zugeordnete Saison: ${getSeasonForDate(editedDate)}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = GlacierBlue)
-                        }
-                        Text("ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CalendarMonth,
+                            contentDescription = null,
+                            tint = GlacierBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = editedDate.format(DateTimeFormatter.ofPattern("EEE, dd. MMMM yyyy", Locale.GERMAN)),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AlpineDark,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
+                // Personen-Auswahl
                 if (allPersons.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
                     FamilyCheckInSelector(
                         allPersons = allPersons,
                         selectedPersonIds = selectedPersonIds,
@@ -2358,8 +2386,7 @@ fun EditVisitDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
+                // Angerechneter Tarif
                 OutlinedTextField(
                     value = editedPriceText,
                     onValueChange = { input ->
@@ -2369,30 +2396,22 @@ fun EditVisitDialog(
                         }
                     },
                     label = { Text("Angerechneter Tarif (€)") },
-                    trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = {
+                        Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue)
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
-                if (defaultVenuePrice != null && defaultVenuePrice != (editedPriceText.toDoubleOrNull() ?: 0.0)) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        "Katalog-Standardtarif: ${defaultVenuePrice.formatEuro()}",
-                        fontSize = 11.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.clickable { editedPriceText = String.format(Locale.US, "%.2f", defaultVenuePrice) }.padding(vertical = 2.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
+                // Schlankes Notizfeld
                 OutlinedTextField(
                     value = editedNotes,
                     onValueChange = { editedNotes = it },
-                    label = { Text("Notiz / Grund für Preisabweichung") },
-                    placeholder = { Text("z. B. Halbtageskarte, Vormittagstarif...") },
+                    label = { Text("Notiz (optional)") },
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    maxLines = 2
                 )
             }
         },
@@ -2402,13 +2421,16 @@ fun EditVisitDialog(
                     val finalAmount = editedPriceText.toDoubleOrNull() ?: visit.savedAmount
                     onSave(editedDate, finalAmount, editedNotes, selectedPersonIds.toList())
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Speichern")
+                Text("Speichern", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen", color = Color.Gray)
+            }
         }
     )
 }
