@@ -866,7 +866,6 @@ fun DashboardView(
 // ==========================================
 // 2. STATISTIKEN, EXPORT & IMPORT
 // ==========================================
-@Composable
 fun generateStoryShareImage(
     context: android.content.Context,
     season: String,
