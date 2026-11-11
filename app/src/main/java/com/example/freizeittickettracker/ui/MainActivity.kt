@@ -588,7 +588,7 @@ fun DashboardView(
                         FilterChip(
                             selected = selectedPersonFilterId == null,
                             onClick = { selectedPersonFilterId = null },
-                            label = { Text("Alle Personen", fontSize = 12.sp) },
+                            label = { Text("Alle", fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = GlacierBlue,
                                 selectedLabelColor = Color.White
@@ -1146,7 +1146,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                         FilterChip(
                             selected = selectedPersonFilterId == null,
                             onClick = { selectedPersonFilterId = null },
-                            label = { Text("Alle Personen", fontSize = 12.sp) },
+                            label = { Text("Alle", fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = GlacierBlue,
                                 selectedLabelColor = Color.White
