@@ -584,22 +584,12 @@ fun DashboardView(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    item {
-                        FilterChip(
-                            selected = selectedPersonFilterId == null,
-                            onClick = { selectedPersonFilterId = null },
-                            label = { Text("Alle", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = GlacierBlue,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
+                    
                     items(allPersonsForFilter) { person ->
                         FilterChip(
                             selected = selectedPersonFilterId == person.id,
                             onClick = {
-                                selectedPersonFilterId = if (selectedPersonFilterId == person.id) null else person.id
+                                selectedPersonFilterId = person.id
                             },
                             label = { Text(person.name, fontSize = 12.sp) },
                             leadingIcon = {
@@ -1142,17 +1132,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    item {
-                        FilterChip(
-                            selected = selectedPersonFilterId == null,
-                            onClick = { selectedPersonFilterId = null },
-                            label = { Text("Alle", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = GlacierBlue,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
+                    
                     items(allPersonsForFilter) { person ->
                         FilterChip(
                             selected = selectedPersonFilterId == person.id,
@@ -3288,4 +3268,88 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
             }
         )
     }
+}
+
+
+// ==========================================
+// Onboarding / Erstinstallation Dialog
+// ==========================================
+@Composable
+fun InitialSetupDialog(viewModel: TicketViewModel) {
+    var nameInput by remember { mutableStateOf("") }
+    var birthYearInput by remember { mutableStateOf("") }
+    var inputError by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { /* Nicht abbrechbar bei Erstinstallation */ },
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Willkommen!",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlpineDark
+                )
+                Text(
+                    text = "Bitte lege dein erstes Ticket-Profil an, um die Ersparnis exakt berechnen zu können.",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Normal
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it; inputError = null },
+                    label = { Text("Name (z.B. Jakob)", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = birthYearInput,
+                    onValueChange = { birthYearInput = it; inputError = null },
+                    label = { Text("Geburtsjahr (z.B. 2008)", fontSize = 12.sp) },
+                    placeholder = { Text("2008", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                inputError?.let { err ->
+                    Text(err, color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val trimmedName = nameInput.trim()
+                    val trimmedYear = birthYearInput.trim()
+                    if (trimmedName.isBlank()) {
+                        inputError = "Bitte gib einen Namen ein."
+                        return@Button
+                    }
+                    val parsedYear = trimmedYear.toIntOrNull()
+                    if (parsedYear == null || parsedYear !in 1920..2026) {
+                        inputError = "Bitte ein gültiges Geburtsjahr eingeben."
+                        return@Button
+                    }
+                    viewModel.addPerson(name = trimmedName, birthYear = parsedYear)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+            ) {
+                Text("Profil anlegen & Starten", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+    )
 }
