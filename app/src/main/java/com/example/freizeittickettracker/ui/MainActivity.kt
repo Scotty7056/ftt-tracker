@@ -872,6 +872,15 @@ enum class StoryTheme(val title: String, val subtitle: String) {
     SUNSET_PEAK("Sunset Peak", "Warmer Alpenglühen-Verlauf")
 }
 
+data class StoryColors(
+    val bgTop: String,
+    val bgBottom: String,
+    val cardBg: String,
+    val textPrimary: String,
+    val textSecondary: String,
+    val accentColor: String
+)
+
 fun generateStoryShareImage(
     context: android.content.Context,
     season: String,
@@ -888,17 +897,26 @@ fun generateStoryShareImage(
         val canvas = android.graphics.Canvas(bitmap)
 
         // Theme Farben definieren
-        val (bgTop, bgBottom, cardBg, textPrimary, textSecondary, accentColor) = when (theme) {
-            StoryTheme.ALPINE_DARK -> arrayOf(
-                "#0F172A", "#1E293B", "#1E293B", "#FFFFFF", "#94A3B8", "#38BDF8"
+        val colors = when (theme) {
+            StoryTheme.ALPINE_DARK -> StoryColors(
+                bgTop = "#0F172A", bgBottom = "#1E293B", cardBg = "#1E293B",
+                textPrimary = "#FFFFFF", textSecondary = "#94A3B8", accentColor = "#38BDF8"
             )
-            StoryTheme.GLACIER_SNOW -> arrayOf(
-                "#F8FAFC", "#E2E8F0", "#FFFFFF", "#0F172A", "#64748B", "#0284C7"
+            StoryTheme.GLACIER_SNOW -> StoryColors(
+                bgTop = "#F8FAFC", bgBottom = "#E2E8F0", cardBg = "#FFFFFF",
+                textPrimary = "#0F172A", textSecondary = "#64748B", accentColor = "#0284C7"
             )
-            StoryTheme.SUNSET_PEAK -> arrayOf(
-                "#31103F", "#1A0B2E", "#2D1B4E", "#FFFFFF", "#F9A8D4", "#F43F5E"
+            StoryTheme.SUNSET_PEAK -> StoryColors(
+                bgTop = "#31103F", bgBottom = "#1A0B2E", cardBg = "#2D1B4E",
+                textPrimary = "#FFFFFF", textSecondary = "#F9A8D4", accentColor = "#F43F5E"
             )
         }
+        val bgTop = colors.bgTop
+        val bgBottom = colors.bgBottom
+        val cardBg = colors.cardBg
+        val textPrimary = colors.textPrimary
+        val textSecondary = colors.textSecondary
+        val accentColor = colors.accentColor
 
         // Hintergrund mit linearem Farbverlauf
         val bgPaint = android.graphics.Paint().apply {
