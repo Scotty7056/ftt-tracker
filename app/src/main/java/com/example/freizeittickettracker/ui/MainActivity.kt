@@ -1162,37 +1162,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                             Text("Saison-Rückblick ${stats.season}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
                         }
                         IconButton(
-                            onClick = {
-                                val pName = selectedPerson?.name ?: ""
-                                val imageUri = generateStoryShareImage(
-                                    context = context.applicationContext,
-                                    season = stats.season,
-                                    personName = pName,
-                                    visitsCount = displayVisits.size,
-                                    savedAmount = effectiveSavedAmount,
-                                    ticketPrice = effectiveTicketPrice
-                                )
-
-                                val shareText = "🎿 Mein FTT Saison-Rückblick ${stats.season}${if (pName.isNotBlank()) " ($pName)" else ""}:\n" +
-                                        "• ${displayVisits.size} Ausflüge absolviert\n" +
-                                        "• ${effectiveSavedAmount.formatEuro()} Wert eingefahren\n" +
-                                        (if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) "• 🎉 Amortisiert mit +${effectiveNetGain.formatEuro()} Reingewinn!\n" else "• ${effectiveRemaining.formatEuro()} noch bis zum Break-Even\n") +
-                                        "Getrackt mit dem FTT Tracker für Android."
-
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    if (imageUri != null) {
-                                        putExtra(Intent.EXTRA_STREAM, imageUri)
-                                        putExtra(Intent.EXTRA_TEXT, shareText)
-                                        type = "image/png"
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    } else {
-                                        putExtra(Intent.EXTRA_TEXT, shareText)
-                                        type = "text/plain"
-                                    }
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "Saison teilen (WhatsApp / Instagram)"))
-                            },
+                        onClick = { showThemeChooserDialog = true },
                             modifier = Modifier.clip(CircleShape).background(GlacierBlue.copy(alpha = 0.1f)).size(40.dp)
                         ) {
                             Icon(Icons.Rounded.Share, contentDescription = "Teilen", tint = GlacierBlue, modifier = Modifier.size(20.dp))
@@ -1363,6 +1333,29 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
                 }
             }
         }
+    }
+    if (showThemeChooserDialog) {
+        val pName = selectedPerson?.name ?: ""
+        StoryThemeChooserDialog(
+            onDismiss = { showThemeChooserDialog = false },
+            onThemeSelected = { chosenTheme ->
+                showThemeChooserDialog = false
+                val imageUri = generateStoryShareImage(
+                    context = context.applicationContext,
+                    season = stats.season,
+                    personName = pName,
+                    visitsCount = displayVisits.size,
+                    savedAmount = effectiveSavedAmount,
+                    ticketPrice = effectiveTicketPrice,
+                    theme = chosenTheme
+                )
+                if (imageUri != null) {
+                    shareStoryImage(context, imageUri)
+                } else {
+                    android.widget.Toast.makeText(context, "Fehler beim Erstellen der Grafik", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
 }
 // ==========================================
@@ -3349,6 +3342,81 @@ fun InitialSetupDialog(viewModel: TicketViewModel) {
                 colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
             ) {
                 Text("Profil anlegen & Starten", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+    )
+}
+
+fun shareStoryImage(context: android.content.Context, uri: android.net.Uri) {
+    val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        clipData = android.content.ClipData.newUri(context.contentResolver, "FTT Story", uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    val chooser = android.content.Intent.createChooser(sendIntent, "Saison-Story teilen").apply {
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(chooser)
+}
+
+@Composable
+fun StoryThemeChooserDialog(
+    onDismiss: () -> Unit,
+    onThemeSelected: (StoryTheme) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text(
+                text = "Story-Design wählen",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlpineDark
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Text("Wähle den Look für deinen Social Media Rückblick:", fontSize = 13.sp, color = Color.Gray)
+
+                val themes = listOf(
+                    Triple(StoryTheme.ALPINE_DARK, "Alpine Dark", Color(0xFF0F172A)),
+                    Triple(StoryTheme.GLACIER_SNOW, "Glacier Snow", Color(0xFF0284C7)),
+                    Triple(StoryTheme.SUNSET_PEAK, "Sunset Peak", Color(0xFFF43F5E))
+                )
+
+                themes.forEach { (theme, label, dotColor) ->
+                    Surface(
+                        onClick = { onThemeSelected(theme) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.Black.copy(alpha = 0.04f),
+                        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.08f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(dotColor)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AlpineDark)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen", color = Color.Gray)
             }
         }
     )
