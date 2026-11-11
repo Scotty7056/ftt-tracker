@@ -1021,6 +1021,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
     val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
     val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
     var selectedPersonFilterId by remember { mutableStateOf<Long?>(null) }
+    var showThemeChooserDialog by remember { mutableStateOf(false) }
 
 
 
