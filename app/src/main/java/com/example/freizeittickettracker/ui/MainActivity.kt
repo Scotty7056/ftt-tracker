@@ -679,7 +679,7 @@ fun DashboardView(
                                 color = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) EmeraldGain else Color.White.copy(alpha = 0.2f)
                             ) {
                                 Text(
-                                    "${(stats.amortizationProgress * 100).toInt()}%",
+                                    "${if (effectiveTicketPrice > 0) ((effectiveSavedAmount / effectiveTicketPrice) * 100).toInt() else 0}%",
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
@@ -691,7 +691,7 @@ fun DashboardView(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         LinearProgressIndicator(
-                            progress = { stats.amortizationProgress.coerceIn(0f, 1f) },
+                            progress = { effectiveProgress },
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                             color = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) EmeraldGain else FrostTeal,
                             trackColor = Color.White.copy(alpha = 0.25f)
@@ -722,13 +722,14 @@ fun DashboardView(
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricTile("aktivit\u00E4ten", stats.totalVisits.toString(), Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
-                val avg = if (stats.totalVisits > 0) stats.totalValueSaved / stats.totalVisits else 0.0
+                val personVisitsCount = displayVisits.size
+                MetricTile("aktivitäten", personVisitsCount.toString(), Icons.Rounded.EventAvailable, GlacierBlue, Modifier.weight(1f))
+                val avg = if (personVisitsCount > 0) effectiveSavedAmount / personVisitsCount else 0.0
                 val (rightTitle, rightValue) = if (effectiveSavedAmount >= effectiveTicketPrice && effectiveTicketPrice > 0) {
                     "Reingewinn" to ("+" + effectiveNetGain.formatEuro())
                 } else {
-                    val needed = if (avg > 0.0) kotlin.math.ceil(stats.remainingToAmortize / avg).toInt() else 0
-                    "Noch n\u00F6tig" to ("ca. " + needed + "x")
+                    val needed = if (avg > 0.0) kotlin.math.ceil(effectiveRemaining / avg).toInt() else 0
+                    "Noch nötig" to ("ca. " + needed + "x")
                 }
                 MetricTile(rightTitle, rightValue, Icons.Rounded.TrendingUp, EmeraldGain, Modifier.weight(1f))
             }
