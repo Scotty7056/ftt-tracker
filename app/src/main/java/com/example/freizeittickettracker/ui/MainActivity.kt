@@ -3249,4 +3249,43 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
             }
         }
     )
+    if (personToDelete != null) {
+        val target = personToDelete!!
+        AlertDialog(
+            onDismissRequest = { personToDelete = null },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    text = "${target.name} entfernen?",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlpineDark
+                )
+            },
+            text = {
+                Text(
+                    text = "Möchtest du das Profil von \"${target.name}\" wirklich löschen? Verknüpfte Ausflüge bleiben in der Gesamtsumme erhalten.",
+                    fontSize = 13.sp,
+                    color = Color.DarkGray
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deletePerson(target)
+                        personToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.85f)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Löschen", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { personToDelete = null }) {
+                    Text("Abbrechen", color = Color.Gray)
+                }
+            }
+        )
+    }
 }
