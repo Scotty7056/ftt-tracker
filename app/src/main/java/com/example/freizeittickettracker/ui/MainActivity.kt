@@ -2634,12 +2634,7 @@ fun EditVisitDialog(
                 // Personen-Auswahl
                 if (allPersons.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "Wer war dabei?",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlpineDark
-                        )
+                        
                         FamilyCheckInSelector(
                             allPersons = allPersons,
                             selectedPersonIds = selectedPersonIds,
