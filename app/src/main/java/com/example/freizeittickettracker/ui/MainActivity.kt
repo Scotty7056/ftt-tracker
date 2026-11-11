@@ -2,7 +2,10 @@ package com.example.freizeittickettracker.ui
 
 
 
-import androidx.compose.foundation.lazy.LazyRow
+
+
+
+import androidx.compose.ui.graphics.asImageBitmapimport androidx.compose.foundation.pager.rememberPagerStateimport androidx.compose.foundation.pager.HorizontalPagerimport androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -1337,19 +1340,16 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
     }
     if (showThemeChooserDialog) {
         val pName = selectedPerson?.name ?: ""
-        StoryThemeChooserDialog(
+        StoryPreviewCarouselDialog(
+            season = stats.season,
+            personName = pName,
+            visitsCount = displayVisits.size,
+            savedAmount = effectiveSavedAmount,
+            ticketPrice = effectiveTicketPrice,
             onDismiss = { showThemeChooserDialog = false },
-            onThemeSelected = { chosenTheme ->
+            onShare = { bitmap ->
                 showThemeChooserDialog = false
-                val imageUri = generateStoryShareImage(
-                    context = context.applicationContext,
-                    season = stats.season,
-                    personName = pName,
-                    visitsCount = displayVisits.size,
-                    savedAmount = effectiveSavedAmount,
-                    ticketPrice = effectiveTicketPrice,
-                    theme = chosenTheme
-                )
+                val imageUri = saveBitmapToCache(context.applicationContext, bitmap)
                 if (imageUri != null) {
                     shareStoryImage(context, imageUri)
                 } else {
@@ -3421,4 +3421,373 @@ fun StoryThemeChooserDialog(
             }
         }
     )
+}
+
+fun generateStoryBitmap(
+    season: String,
+    personName: String,
+    visitsCount: Int,
+    savedAmount: Double,
+    ticketPrice: Double,
+    theme: StoryTheme
+): android.graphics.Bitmap {
+    val width = 1080
+    val height = 1920
+    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+
+    data class ThemeVisuals(
+        val bgTop: Int, val bgBottom: Int, val mountainFar: Int, val mountainNear: Int,
+        val cardBg: Int, val cardBorder: Int, val textPrimary: Int, val textSecondary: Int,
+        val accent: Int, val progressTrack: Int
+    )
+
+    val visuals = when (theme) {
+        StoryTheme.ALPINE_DARK -> ThemeVisuals(
+            bgTop = android.graphics.Color.parseColor("#070B19"),
+            bgBottom = android.graphics.Color.parseColor("#0F172A"),
+            mountainFar = android.graphics.Color.argb(70, 30, 41, 59),
+            mountainNear = android.graphics.Color.argb(140, 15, 23, 42),
+            cardBg = android.graphics.Color.argb(190, 30, 41, 59),
+            cardBorder = android.graphics.Color.argb(100, 56, 189, 248),
+            textPrimary = android.graphics.Color.parseColor("#F8FAFC"),
+            textSecondary = android.graphics.Color.parseColor("#94A3B8"),
+            accent = android.graphics.Color.parseColor("#38BDF8"),
+            progressTrack = android.graphics.Color.argb(80, 255, 255, 255)
+        )
+        StoryTheme.GLACIER_SNOW -> ThemeVisuals(
+            bgTop = android.graphics.Color.parseColor("#E0F2FE"),
+            bgBottom = android.graphics.Color.parseColor("#BAE6FD"),
+            mountainFar = android.graphics.Color.argb(90, 186, 230, 253),
+            mountainNear = android.graphics.Color.argb(170, 255, 255, 255),
+            cardBg = android.graphics.Color.argb(230, 255, 255, 255),
+            cardBorder = android.graphics.Color.argb(80, 2, 132, 199),
+            textPrimary = android.graphics.Color.parseColor("#0F172A"),
+            textSecondary = android.graphics.Color.parseColor("#475569"),
+            accent = android.graphics.Color.parseColor("#0284C7"),
+            progressTrack = android.graphics.Color.argb(50, 0, 0, 0)
+        )
+        StoryTheme.SUNSET_PEAK -> ThemeVisuals(
+            bgTop = android.graphics.Color.parseColor("#2E0836"),
+            bgBottom = android.graphics.Color.parseColor("#6B1D4F"),
+            mountainFar = android.graphics.Color.argb(90, 74, 18, 62),
+            mountainNear = android.graphics.Color.argb(160, 41, 8, 38),
+            cardBg = android.graphics.Color.argb(190, 56, 15, 52),
+            cardBorder = android.graphics.Color.argb(120, 244, 63, 94),
+            textPrimary = android.graphics.Color.parseColor("#FFFFFF"),
+            textSecondary = android.graphics.Color.parseColor("#FBCFE8"),
+            accent = android.graphics.Color.parseColor("#F59E0B"),
+            progressTrack = android.graphics.Color.argb(80, 255, 255, 255)
+        )
+    }
+
+    val bgPaint = android.graphics.Paint().apply {
+        shader = android.graphics.LinearGradient(
+            0f, 0f, 0f, height.toFloat(),
+            visuals.bgTop, visuals.bgBottom,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+    fun drawMountain(pathYBase: Float, p1: android.graphics.PointF, p2: android.graphics.PointF, p3: android.graphics.PointF, paint: android.graphics.Paint) {
+        val path = android.graphics.Path().apply {
+            moveTo(0f, pathYBase)
+            lineTo(p1.x, p1.y)
+            lineTo(p2.x, p2.y)
+            lineTo(p3.x, p3.y)
+            lineTo(width.toFloat(), pathYBase)
+            lineTo(width.toFloat(), height.toFloat())
+            lineTo(0f, height.toFloat())
+            close()
+        }
+        canvas.drawPath(path, paint)
+    }
+
+    val farMountainPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.mountainFar
+        style = android.graphics.Paint.Style.FILL
+    }
+    drawMountain(1550f, android.graphics.PointF(280f, 1320f), android.graphics.PointF(640f, 1410f), android.graphics.PointF(920f, 1350f), farMountainPaint)
+
+    val nearMountainPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.mountainNear
+        style = android.graphics.Paint.Style.FILL
+    }
+    drawMountain(1700f, android.graphics.PointF(190f, 1500f), android.graphics.PointF(520f, 1580f), android.graphics.PointF(860f, 1470f), nearMountainPaint)
+
+    val brandPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.accent
+        textSize = 34f
+        isFakeBoldText = true
+        letterSpacing = 0.12f
+    }
+    canvas.drawText("FREIZEITTICKET TRACKER", 90f, 190f, brandPaint)
+
+    val titlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textPrimary
+        textSize = 76f
+        isFakeBoldText = true
+    }
+    canvas.drawText("Saison-Rückblick", 90f, 280f, titlePaint)
+
+    val subTitlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textSecondary
+        textSize = 38f
+    }
+    val nameTag = if (personName.isNotBlank()) " • $personName" else ""
+    canvas.drawText("Saison $season$nameTag", 90f, 340f, subTitlePaint)
+
+    val cardPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.cardBg
+        style = android.graphics.Paint.Style.FILL
+    }
+    val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.cardBorder
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
+    val heroRect = android.graphics.RectF(90f, 430f, 990f, 940f)
+    canvas.drawRoundRect(heroRect, 38f, 38f, cardPaint)
+    canvas.drawRoundRect(heroRect, 38f, 38f, borderPaint)
+
+    val labelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textSecondary
+        textSize = 28f
+        letterSpacing = 0.1f
+        isFakeBoldText = true
+    }
+    canvas.drawText("EINGEFAHRENER GESAMTWERT", 140f, 510f, labelPaint)
+
+    val amountPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textPrimary
+        textSize = 92f
+        isFakeBoldText = true
+    }
+    canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), 140f, 620f, amountPaint)
+
+    val isAmortized = ticketPrice > 0 && savedAmount >= ticketPrice
+    val progressRatio = if (ticketPrice > 0) (savedAmount / ticketPrice).coerceIn(0.0, 1.0).toFloat() else 1.0f
+    val percent = if (ticketPrice > 0) ((savedAmount / ticketPrice) * 100).toInt() else 100
+
+    val barLeft = 140f
+    val barRight = 940f
+    val barY = 700f
+    val barHeight = 22f
+
+    val trackPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.progressTrack
+        style = android.graphics.Paint.Style.FILL
+    }
+    canvas.drawRoundRect(android.graphics.RectF(barLeft, barY, barRight, barY + barHeight), 11f, 11f, trackPaint)
+
+    val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isAmortized) android.graphics.Color.parseColor("#10B981") else visuals.accent
+        style = android.graphics.Paint.Style.FILL
+    }
+    val fillWidth = (barRight - barLeft) * progressRatio
+    if (fillWidth > 0) {
+        canvas.drawRoundRect(android.graphics.RectF(barLeft, barY, barLeft + fillWidth, barY + barHeight), 11f, 11f, fillPaint)
+    }
+
+    val statusText = if (isAmortized) {
+        val gain = savedAmount - ticketPrice
+        "🎉 Break-Even erreicht! +${String.format(java.util.Locale.GERMAN, "%.2f €", gain)} Reingewinn ($percent%)"
+    } else {
+        val remain = (ticketPrice - savedAmount).coerceAtLeast(0.0)
+        "Noch ${String.format(java.util.Locale.GERMAN, "%.2f €", remain)} bis zum Break-Even ($percent%)"
+    }
+
+    val statusPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isAmortized) android.graphics.Color.parseColor("#10B981") else visuals.accent
+        textSize = 34f
+        isFakeBoldText = true
+    }
+    canvas.drawText(statusText, 140f, 800f, statusPaint)
+
+    val statRect = android.graphics.RectF(90f, 990f, 990f, 1310f)
+    canvas.drawRoundRect(statRect, 38f, 38f, cardPaint)
+    canvas.drawRoundRect(statRect, 38f, 38f, borderPaint)
+
+    canvas.drawText("ABSOLVIERTE AUSFLÜGE", 140f, 1070f, labelPaint)
+
+    val countText = if (visitsCount == 1) "1 Ausflug" else "$visitsCount Ausflüge"
+    val countPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textPrimary
+        textSize = 72f
+        isFakeBoldText = true
+    }
+    canvas.drawText(countText, 140f, 1175f, countPaint)
+
+    val countSubText = if (visitsCount > 0) {
+        val avg = savedAmount / visitsCount
+        "Ø Ersparnis: ${String.format(java.util.Locale.GERMAN, "%.2f €", avg)} pro Tag"
+    } else {
+        "Noch keine Ausflüge eingetragen"
+    }
+    val avgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textSecondary
+        textSize = 32f
+    }
+    canvas.drawText(countSubText, 140f, 1245f, avgPaint)
+
+    val footerPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = visuals.textSecondary
+        textSize = 30f
+    }
+    canvas.drawText("🎿 Freizeitticket Tracker • Saison $season", 90f, 1820f, footerPaint)
+
+    return bitmap
+}
+
+fun saveBitmapToCache(context: android.content.Context, bitmap: android.graphics.Bitmap): android.net.Uri? {
+    return try {
+        val cacheFolder = java.io.File(context.cacheDir, "story_shares").apply { mkdirs() }
+        val file = java.io.File(cacheFolder, "ftt_story_${System.currentTimeMillis()}.png")
+        val stream = java.io.FileOutputStream(file)
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+        stream.close()
+        androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    } catch (e: Exception) {
+        android.util.Log.e("FTT_SHARE", "Fehler beim Speichern der Story", e)
+        null
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun StoryPreviewCarouselDialog(
+    season: String,
+    personName: String,
+    visitsCount: Int,
+    savedAmount: Double,
+    ticketPrice: Double,
+    onDismiss: () -> Unit,
+    onShare: (android.graphics.Bitmap) -> Unit
+) {
+    val themes = listOf(
+        Pair(StoryTheme.ALPINE_DARK, "Alpine Dark"),
+        Pair(StoryTheme.GLACIER_SNOW, "Glacier Snow"),
+        Pair(StoryTheme.SUNSET_PEAK, "Sunset Peak")
+    )
+
+    // Rendern der drei Bitmaps im Speicher für verzögerungsfreie Vorschau
+    val bitmaps = remember(season, personName, visitsCount, savedAmount, ticketPrice) {
+        themes.map { (theme, _) ->
+            generateStoryBitmap(season, personName, visitsCount, savedAmount, ticketPrice, theme)
+        }
+    }
+
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { themes.size })
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.90f),
+            shape = RoundedCornerShape(24.dp),
+            color = AlpineNavy
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterVertically
+            ) {
+                // Header mit Titel und Schließen-Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Story-Grafik wählen", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Wische nach links/rechts", fontSize = 12.sp, color = Color.LightGray)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Schließen", tint = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // HorizontalPager für das Wischen durch die 3 Grafiken
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) { page ->
+                    val bmp = bitmaps[page]
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterVertically,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(9f / 16f)
+                        ) {
+                            androidx.compose.foundation.Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = themes[page].second,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Theme-Name & Pager-Indikatorpunkte
+                Text(
+                    text = themes[pagerState.currentPage].second,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                ) {
+                    repeat(themes.size) { index ->
+                        val isSelected = pagerState.currentPage == index
+                        Box(
+                            modifier = Modifier
+                                .size(if (isSelected) 10.dp else 6.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) GlacierBlue else Color.White.copy(alpha = 0.3f))
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Button zum Teilen der aktuellen Auswahl
+                Button(
+                    onClick = {
+                        val chosenBitmap = bitmaps[pagerState.currentPage]
+                        onShare(chosenBitmap)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+                ) {
+                    Icon(Icons.Rounded.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Diese Grafik teilen", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+                }
+            }
+        }
+    }
 }
