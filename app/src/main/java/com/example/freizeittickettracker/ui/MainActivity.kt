@@ -1069,16 +1069,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
     }
         val context = LocalContext.current
-    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
-    val csvExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        uri?.let { targetUri ->
-            pendingCsvContent?.let { content ->
-                try {
-                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
-                        stream.write(content.toByteArray(Charsets.UTF_8))
-                    }
                     Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
@@ -1256,89 +1246,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             }
         }
 
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = CardSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Datensicherung & Export", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-                    Text("Daten per CSV sichern oder aus alten Notizen importieren.", fontSize = 12.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    val personMap = allPersonsForFilter.associateBy { it.id }
-                                    val personsByVisit = crossRefs.groupBy { it.visitId }.mapValues { (_, refs) ->
-                                        refs.mapNotNull { personMap[it.personId]?.name }
-                                    }
-                                    val csvData = AutoBackupManager.exportCsv(visits, personsByVisit)
-pendingCsvContent = csvData
-val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-csvExportLauncher.launch("ftt_visits_$timestamp.csv")
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Export", fontSize = 11.sp, maxLines = 1)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                importLauncher.launch(arrayOf("text/*", "text/comma-separated-values", "text/csv", "application/csv"))
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Import", fontSize = 11.sp, maxLines = 1)
-                        }
-
-                        Button(
-                            onClick = {
-                                coroutineScope.launch {
-                                    AutoBackupManager.performAutoBackup(context, visits)
-                                    Toast.makeText(context, "\u2705 Lokales Backup erfolgreich aktualisiert", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Backup", fontSize = 11.sp, maxLines = 1)
-                        }
-                    }
-                        // Wiederherstellen Button
-                        OutlinedButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    val restored = AutoBackupManager.restoreAutoBackup(context)
-                                    if (restored.isNotEmpty()) {
-                                        viewModel.restoreVisits(restored) { count ->
-                                            Toast.makeText(context, "\u2705 $count Aktivitäten wiederhergestellt!", Toast.LENGTH_LONG).show()
-                                        }
-                                    } else {
-                                        Toast.makeText(context, "\u26A0\uFE0F Kein lokales Backup gefunden", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Restore", fontSize = 11.sp, maxLines = 1)
-                        }
-                }
             }
         }
     }
