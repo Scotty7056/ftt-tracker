@@ -3699,7 +3699,7 @@ fun StoryPreviewCarouselDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                horizontalAlignment = Alignment.CenterVertically
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header mit Titel und Schließen-Button
                 Row(
@@ -3728,7 +3728,7 @@ fun StoryPreviewCarouselDialog(
                     val bmp = bitmaps[page]
                     Column(
                         modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterVertically,
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         Card(
