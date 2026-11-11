@@ -3093,7 +3093,7 @@ fun FamilySettingsDialog(
                                     }
                                     IconButton(
                                         onClick = { personToDelete = person },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
                                             Icons.Rounded.Delete,
