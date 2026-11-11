@@ -3268,7 +3268,7 @@ csvExportLauncher.launch("ftt_visits_$timestamp.csv")
 // Onboarding / Erstinstallation Dialog
 // ==========================================
 @Composable
-fun InitialSetupDialog(viewModel: TicketViewModel) {
+fun InitialSetupDialog(viewModel: TrackerViewModel) {
     var nameInput by remember { mutableStateOf("") }
     var birthYearInput by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
