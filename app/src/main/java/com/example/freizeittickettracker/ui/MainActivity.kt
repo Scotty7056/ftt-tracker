@@ -3091,7 +3091,7 @@ fun FamilySettingsDialog(
                                         )
                                     }
                                     IconButton(
-                                        onClick = { viewModel.deletePerson(person) },
+                                        onClick = { personToDelete = person },
                                         modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
