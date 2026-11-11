@@ -1571,6 +1571,7 @@ fun OsmMapOverviewView(
                             this
                         ) {
                             override fun onOpen(item: Any?) {
+                                org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(this@apply)
                                 super.onOpen(item)
                                 mView?.isClickable = true
                                 mView?.isLongClickable = true
