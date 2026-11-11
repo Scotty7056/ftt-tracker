@@ -3002,6 +3002,7 @@ fun FamilySettingsDialog(
     var nameInput by remember { mutableStateOf("") }
     var birthYearInput by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
+    var personToDelete by remember { mutableStateOf<com.example.freizeittickettracker.data.PersonProfile?>(null) }
 
     var pendingCsvContent by remember { mutableStateOf<String?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
