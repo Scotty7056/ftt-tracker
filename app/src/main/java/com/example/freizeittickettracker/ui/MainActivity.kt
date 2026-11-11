@@ -745,7 +745,7 @@ fun DashboardView(
             ) {
                 Icon(Icons.Rounded.AddLocationAlt, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Besuch manuell Eintr\u00E4gen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text("Besuch manuell eintragen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -2261,7 +2261,7 @@ fun ManualVisitDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Besuch manuell Eintr\u00E4gen", fontWeight = FontWeight.Bold, color = AlpineDark) },
+        title = { Text("Besuch manuell eintragen", fontWeight = FontWeight.Bold, color = AlpineDark) },
         text = {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 OutlinedCard(
@@ -3040,94 +3040,6 @@ fun FamilySettingsDialog(
                     Text("Profil anlegen", fontSize = 12.sp)
                 }
 
-                Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.4f))
-
-                // ABSCHNITT 2: DATENSICHERUNG & EXPORT
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Storage, contentDescription = null, tint = AlpineNavy, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Datensicherung & Backup", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineNavy)
-                }
-
-                Text(
-                    "Besuche als CSV sichern, Notizen importieren oder ein lokales Backup erstellen.",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(
-                        onClick = {
-                            val personMap = persons.associateBy { it.id }
-                            val personsByVisit = crossRefs.groupBy { it.visitId }.mapValues { (_, refs) ->
-                                refs.mapNotNull { personMap[it.personId]?.name }
-                            }
-                            val csvData = AutoBackupManager.exportCsv(visits, personsByVisit)
-pendingCsvContent = csvData
-val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-csvExportLauncher.launch("ftt_visits_$timestamp.csv")
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Export", fontSize = 11.sp, maxLines = 1)
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            importLauncher.launch(arrayOf("text/*", "text/comma-separated-values", "text/csv", "application/csv"))
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Import", fontSize = 11.sp, maxLines = 1)
-                    }
-
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                AutoBackupManager.performAutoBackup(context, visits)
-                                Toast.makeText(context, "\u2705 Lokales Backup gespeichert", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Backup", fontSize = 11.sp, maxLines = 1)
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            val restored = AutoBackupManager.restoreAutoBackup(context)
-                            if (restored.isNotEmpty()) {
-                                viewModel.restoreVisits(restored) { count ->
-                                    Toast.makeText(context, "\u2705 $count Einträge wiederhergestellt!", Toast.LENGTH_LONG).show()
-                                }
-                            } else {
-                                Toast.makeText(context, "\u26A0\uFE0F Kein lokales Backup vorhanden", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Aus lokalem Backup wiederherstellen", fontSize = 12.sp)
-                }
-            }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
