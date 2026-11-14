@@ -537,6 +537,11 @@ fun DashboardView(
     val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
     val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
     var selectedPersonFilterId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(allPersonsForFilter) {
+        if (allPersonsForFilter.isNotEmpty() && (selectedPersonFilterId == null || allPersonsForFilter.none { it.id == selectedPersonFilterId })) {
+            selectedPersonFilterId = allPersonsForFilter.first().id
+        }
+    }
 
     val displayVisits = remember(visits, crossRefs, selectedPersonFilterId) {
         if (selectedPersonFilterId == null) {
@@ -1028,6 +1033,11 @@ fun StatisticsView(viewModel: TrackerViewModel) {
     val allPersonsForFilter by viewModel.allPersons.collectAsState(initial = emptyList())
     val crossRefs by viewModel.allCrossRefs.collectAsState(initial = emptyList())
     var selectedPersonFilterId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(allPersonsForFilter) {
+        if (allPersonsForFilter.isNotEmpty() && (selectedPersonFilterId == null || allPersonsForFilter.none { it.id == selectedPersonFilterId })) {
+            selectedPersonFilterId = allPersonsForFilter.first().id
+        }
+    }
     var showThemeChooserDialog by remember { mutableStateOf(false) }
 
 
