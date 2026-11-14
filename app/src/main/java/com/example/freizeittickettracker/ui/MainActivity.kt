@@ -725,10 +725,6 @@ fun DashboardView(
                 }
             }
         }
-
-            }
-        }
-    }
     if (showThemeChooserDialog) {
         val pName = selectedPerson?.name ?: ""
         StoryPreviewCarouselDialog(
