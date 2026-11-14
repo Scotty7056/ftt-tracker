@@ -402,6 +402,7 @@ fun MainScreen(
         selectedDetailVenue?.let { venue ->
             VenueDetailBottomSheet(
                 venue = venue,
+                allPersons = allPersons,
                 existingVisits = allVisits,
                 onDismiss = { selectedDetailVenue = null },
                 onNavigateToMap = {
@@ -409,8 +410,8 @@ fun MainScreen(
                     selectedDetailVenue = null
                     selectedTab = 3
                 },
-                onBookVisit = { chosenDate, customPrice, note ->
-                    viewModel.recordVisit(venue, chosenDate, note, customPrice)
+                onBookVisit = { chosenDate, customPrice, note, personIds ->
+                    viewModel.recordVisit(venue, chosenDate, note, customPrice, personIds)
                     Toast.makeText(
                         context,
                         "✅ ${venue.name} (${chosenDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}) eingebucht!",
