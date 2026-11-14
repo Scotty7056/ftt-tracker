@@ -204,6 +204,7 @@ fun MainScreen(
     val selectedSeason by viewModel.selectedSeason.collectAsState()
     val availableSeasons by viewModel.availableSeasons.collectAsState(initial = listOf(selectedSeason))
     val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
+    val allPersons by viewModel.allPersons.collectAsState(initial = emptyList())
         val context = LocalContext.current
     var pendingCsvContent by remember { mutableStateOf<String?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
@@ -411,7 +412,17 @@ fun MainScreen(
                     selectedTab = 3
                 },
                 onBookVisit = { chosenDate, customPrice, note, personIds ->
-                    viewModel.recordVisit(venue, chosenDate, note, customPrice, personIds)
+                    val season = getSeasonForDate(chosenDate)
+                    val newVisit = VisitEntity(
+                        venueId = venue.id,
+                        venueName = venue.name,
+                        category = venue.category.name,
+                        date = chosenDate,
+                        savedAmount = customPrice,
+                        season = season,
+                        notes = note
+                    )
+                    viewModel.saveVisitWithPersons(newVisit, personIds)
                     Toast.makeText(
                         context,
                         "✅ ${venue.name} (${chosenDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}) eingebucht!",
@@ -581,6 +592,7 @@ fun DashboardView(
         (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
     }
     val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
+    val allPersons by viewModel.allPersons.collectAsState(initial = emptyList())
     var showAddVisitDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -1414,6 +1426,7 @@ fun OsmMapOverviewView(
     val userLocation by viewModel.currentLocation.collectAsState(initial = null)
     var userLocationMarker by remember { mutableStateOf<Marker?>(null) }
     val allVisits by viewModel.allVisits.collectAsState(initial = emptyList())
+    val allPersons by viewModel.allPersons.collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
     val visitedVenueIdsToday = remember(allVisits) {
         allVisits.filter { it.date == today }.map { it.venueId }.toSet()
