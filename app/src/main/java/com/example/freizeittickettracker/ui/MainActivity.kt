@@ -892,7 +892,7 @@ fun generateStoryShareImage(
     visitsCount: Int,
     savedAmount: Double,
     ticketPrice: Double,
-    theme: StoryTheme = StoryTheme.RING_NEON
+    theme: StoryTheme = StoryTheme.POSTER_SKI
 ): android.net.Uri? {
     return try {
         val width = 1080
@@ -902,11 +902,11 @@ fun generateStoryShareImage(
 
         // Theme Farben definieren
         val colors = when (theme) {
-            StoryTheme.RING_NEON -> StoryColors(
+            StoryTheme.POSTER_SKI -> StoryColors(
                 bgTop = "#0F172A", bgBottom = "#1E293B", cardBg = "#1E293B",
                 textPrimary = "#FFFFFF", textSecondary = "#94A3B8", accentColor = "#38BDF8"
             )
-            StoryTheme.RING_GLACIER -> StoryColors(
+            StoryTheme.POSTER_POWDER -> StoryColors(
                 bgTop = "#F8FAFC", bgBottom = "#E2E8F0", cardBg = "#FFFFFF",
                 textPrimary = "#0F172A", textSecondary = "#64748B", accentColor = "#0284C7"
             )
@@ -963,7 +963,7 @@ fun generateStoryShareImage(
             color = android.graphics.Color.parseColor(cardBg)
         }
         val cardBorder = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (theme == StoryTheme.RING_GLACIER) android.graphics.Color.parseColor("#CBD5E1") else android.graphics.Color.parseColor("#334155")
+            color = if (theme == StoryTheme.POSTER_POWDER) android.graphics.Color.parseColor("#CBD5E1") else android.graphics.Color.parseColor("#334155")
             style = android.graphics.Paint.Style.STROKE
             strokeWidth = 3f
         }
@@ -3197,9 +3197,9 @@ fun StoryThemeChooserDialog(
                 Text("Wähle den Look für deinen Social Media Rückblick:", fontSize = 13.sp, color = Color.Gray)
 
                 val themes = listOf(
-                    Triple(StoryTheme.RING_NEON, "Alpine Dark", Color(0xFF0F172A)),
-                    Triple(StoryTheme.RING_GLACIER, "Glacier Snow", Color(0xFF0284C7)),
-                    Triple(StoryTheme.RING_SUNSET, "Sunset Peak", Color(0xFFF43F5E))
+                    Triple(StoryTheme.POSTER_SKI, "Alpine Dark", Color(0xFF0F172A)),
+                    Triple(StoryTheme.POSTER_POWDER, "Glacier Snow", Color(0xFF0284C7)),
+                    Triple(StoryTheme.POSTER_AURORA, "Sunset Peak", Color(0xFFF43F5E))
                 )
 
                 themes.forEach { (theme, label, dotColor) ->
