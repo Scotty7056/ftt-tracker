@@ -893,7 +893,7 @@ fun generateStoryShareImage(
     visitsCount: Int,
     savedAmount: Double,
     ticketPrice: Double,
-    theme: StoryTheme = StoryTheme.ALPINE_DARK
+    theme: StoryTheme = StoryTheme.RING_NEON
 ): android.net.Uri? {
     return try {
         val width = 1080
@@ -903,15 +903,15 @@ fun generateStoryShareImage(
 
         // Theme Farben definieren
         val colors = when (theme) {
-            StoryTheme.ALPINE_DARK -> StoryColors(
+            StoryTheme.RING_NEON -> StoryColors(
                 bgTop = "#0F172A", bgBottom = "#1E293B", cardBg = "#1E293B",
                 textPrimary = "#FFFFFF", textSecondary = "#94A3B8", accentColor = "#38BDF8"
             )
-            StoryTheme.GLACIER_SNOW -> StoryColors(
+            StoryTheme.RING_GLACIER -> StoryColors(
                 bgTop = "#F8FAFC", bgBottom = "#E2E8F0", cardBg = "#FFFFFF",
                 textPrimary = "#0F172A", textSecondary = "#64748B", accentColor = "#0284C7"
             )
-            StoryTheme.SUNSET_PEAK -> StoryColors(
+            StoryTheme.RING_SUNSET -> StoryColors(
                 bgTop = "#31103F", bgBottom = "#1A0B2E", cardBg = "#2D1B4E",
                 textPrimary = "#FFFFFF", textSecondary = "#F9A8D4", accentColor = "#F43F5E"
             )
@@ -964,7 +964,7 @@ fun generateStoryShareImage(
             color = android.graphics.Color.parseColor(cardBg)
         }
         val cardBorder = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (theme == StoryTheme.GLACIER_SNOW) android.graphics.Color.parseColor("#CBD5E1") else android.graphics.Color.parseColor("#334155")
+            color = if (theme == StoryTheme.RING_GLACIER) android.graphics.Color.parseColor("#CBD5E1") else android.graphics.Color.parseColor("#334155")
             style = android.graphics.Paint.Style.STROKE
             strokeWidth = 3f
         }
@@ -3198,9 +3198,9 @@ fun StoryThemeChooserDialog(
                 Text("Wähle den Look für deinen Social Media Rückblick:", fontSize = 13.sp, color = Color.Gray)
 
                 val themes = listOf(
-                    Triple(StoryTheme.ALPINE_DARK, "Alpine Dark", Color(0xFF0F172A)),
-                    Triple(StoryTheme.GLACIER_SNOW, "Glacier Snow", Color(0xFF0284C7)),
-                    Triple(StoryTheme.SUNSET_PEAK, "Sunset Peak", Color(0xFFF43F5E))
+                    Triple(StoryTheme.RING_NEON, "Alpine Dark", Color(0xFF0F172A)),
+                    Triple(StoryTheme.RING_GLACIER, "Glacier Snow", Color(0xFF0284C7)),
+                    Triple(StoryTheme.RING_SUNSET, "Sunset Peak", Color(0xFFF43F5E))
                 )
 
                 themes.forEach { (theme, label, dotColor) ->
@@ -3268,8 +3268,13 @@ fun generateStoryBitmap(
         // VARIANTE 1: PLAKATIVES TYPO- & DONUT-RING-DESIGN (OHNE KÄSTEN / EMOJIS)
         // =========================================================================
         val isLight = theme == StoryTheme.RING_GLACIER
-        val (bgTop, bgBot, glowCol, ringAccent, ringSecondary, textMain, textSub, lineCol) = when (theme) {
-            StoryTheme.RING_NEON -> listOf(
+        data class RingPalette(
+            val bgTop: Int, val bgBot: Int, val glowCol: Int,
+            val ringAccent: Int, val ringSecondary: Int,
+            val textMain: Int, val textSub: Int, val lineCol: Int
+        )
+        val rp = when (theme) {
+            StoryTheme.RING_NEON -> RingPalette(
                 android.graphics.Color.parseColor("#05070F"),
                 android.graphics.Color.parseColor("#0B1120"),
                 android.graphics.Color.argb(115, 16, 185, 129),
@@ -3279,7 +3284,7 @@ fun generateStoryBitmap(
                 android.graphics.Color.parseColor("#94A3B8"),
                 android.graphics.Color.argb(45, 255, 255, 255)
             )
-            StoryTheme.RING_GLACIER -> listOf(
+            StoryTheme.RING_GLACIER -> RingPalette(
                 android.graphics.Color.parseColor("#F8FAFC"),
                 android.graphics.Color.parseColor("#E0F2FE"),
                 android.graphics.Color.argb(130, 56, 189, 248),
@@ -3289,7 +3294,7 @@ fun generateStoryBitmap(
                 android.graphics.Color.parseColor("#475569"),
                 android.graphics.Color.argb(35, 15, 23, 42)
             )
-            else -> listOf(
+            else -> RingPalette(
                 android.graphics.Color.parseColor("#14071E"),
                 android.graphics.Color.parseColor("#2E0927"),
                 android.graphics.Color.argb(135, 244, 63, 94),
@@ -3300,6 +3305,9 @@ fun generateStoryBitmap(
                 android.graphics.Color.argb(45, 255, 255, 255)
             )
         }
+        val bgTop = rp.bgTop; val bgBot = rp.bgBot; val glowCol = rp.glowCol
+        val ringAccent = rp.ringAccent; val ringSecondary = rp.ringSecondary
+        val textMain = rp.textMain; val textSub = rp.textSub; val lineCol = rp.lineCol
 
         // Hintergrund & subtiler Aura-Glow hinter dem Ring
         val bgPaint = android.graphics.Paint().apply {
