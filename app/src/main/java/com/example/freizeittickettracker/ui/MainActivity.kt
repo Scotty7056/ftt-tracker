@@ -1243,6 +1243,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         )
     }
 }
+}
 // ==========================================
 // 3. KALENDER & KARTE
 // ==========================================
@@ -3588,5 +3589,4 @@ fun StoryPreviewCarouselDialog(
             }
         }
     }
-}
 }
