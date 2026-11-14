@@ -3238,214 +3238,282 @@ fun generateStoryBitmap(
     visitsCount: Int,
     savedAmount: Double,
     ticketPrice: Double,
-    theme: StoryTheme
+    theme: StoryTheme,
+    topVenueLabel: String = "–",
+    topCategoryLabel: String = "–"
 ): android.graphics.Bitmap {
     val width = 1080
     val height = 1920
     val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
 
-    data class ThemeVisuals(
-        val bgTop: Int, val bgBottom: Int, val mountainFar: Int, val mountainNear: Int,
-        val cardBg: Int, val cardBorder: Int, val textPrimary: Int, val textSecondary: Int,
-        val accent: Int, val progressTrack: Int
-    )
-
-    val visuals = when (theme) {
-        StoryTheme.ALPINE_DARK -> ThemeVisuals(
-            bgTop = android.graphics.Color.parseColor("#070B19"),
-            bgBottom = android.graphics.Color.parseColor("#0F172A"),
-            mountainFar = android.graphics.Color.argb(70, 30, 41, 59),
-            mountainNear = android.graphics.Color.argb(140, 15, 23, 42),
-            cardBg = android.graphics.Color.argb(190, 30, 41, 59),
-            cardBorder = android.graphics.Color.argb(100, 56, 189, 248),
-            textPrimary = android.graphics.Color.parseColor("#F8FAFC"),
-            textSecondary = android.graphics.Color.parseColor("#94A3B8"),
-            accent = android.graphics.Color.parseColor("#38BDF8"),
-            progressTrack = android.graphics.Color.argb(80, 255, 255, 255)
-        )
-        StoryTheme.GLACIER_SNOW -> ThemeVisuals(
-            bgTop = android.graphics.Color.parseColor("#E0F2FE"),
-            bgBottom = android.graphics.Color.parseColor("#BAE6FD"),
-            mountainFar = android.graphics.Color.argb(90, 186, 230, 253),
-            mountainNear = android.graphics.Color.argb(170, 255, 255, 255),
-            cardBg = android.graphics.Color.argb(230, 255, 255, 255),
-            cardBorder = android.graphics.Color.argb(80, 2, 132, 199),
-            textPrimary = android.graphics.Color.parseColor("#0F172A"),
-            textSecondary = android.graphics.Color.parseColor("#475569"),
-            accent = android.graphics.Color.parseColor("#0284C7"),
-            progressTrack = android.graphics.Color.argb(50, 0, 0, 0)
-        )
-        StoryTheme.SUNSET_PEAK -> ThemeVisuals(
-            bgTop = android.graphics.Color.parseColor("#2E0836"),
-            bgBottom = android.graphics.Color.parseColor("#6B1D4F"),
-            mountainFar = android.graphics.Color.argb(90, 74, 18, 62),
-            mountainNear = android.graphics.Color.argb(160, 41, 8, 38),
-            cardBg = android.graphics.Color.argb(190, 56, 15, 52),
-            cardBorder = android.graphics.Color.argb(120, 244, 63, 94),
-            textPrimary = android.graphics.Color.parseColor("#FFFFFF"),
-            textSecondary = android.graphics.Color.parseColor("#FBCFE8"),
-            accent = android.graphics.Color.parseColor("#F59E0B"),
-            progressTrack = android.graphics.Color.argb(80, 255, 255, 255)
-        )
+    val isLight = theme == StoryTheme.GLACIER_SNOW
+    val (bgTop, bgMid, bgBottom) = when (theme) {
+        StoryTheme.ALPINE_DARK -> Triple("#050816", "#0F172A", "#1E293B")
+        StoryTheme.GLACIER_SNOW -> Triple("#E0F2FE", "#BAE6FD", "#F0F9FF")
+        StoryTheme.SUNSET_PEAK -> Triple("#1E0936", "#581C5C", "#BE185D")
     }
 
-    val bgPaint = android.graphics.Paint().apply {
+    // 1. Mehrfarbiger Himmelsverlauf
+    val skyPaint = android.graphics.Paint().apply {
         shader = android.graphics.LinearGradient(
             0f, 0f, 0f, height.toFloat(),
-            visuals.bgTop, visuals.bgBottom,
+            intArrayOf(
+                android.graphics.Color.parseColor(bgTop),
+                android.graphics.Color.parseColor(bgMid),
+                android.graphics.Color.parseColor(bgBottom)
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
             android.graphics.Shader.TileMode.CLAMP
         )
     }
-    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), skyPaint)
 
-    fun drawMountain(pathYBase: Float, p1: android.graphics.PointF, p2: android.graphics.PointF, p3: android.graphics.PointF, paint: android.graphics.Paint) {
+    // 2. Atmosphärische Lichtakzente (Sonne / Polarlicht / Gletscher-Glow)
+    val glowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    when (theme) {
+        StoryTheme.ALPINE_DARK -> {
+            // Polarlicht-Schimmer + Sterne
+            glowPaint.shader = android.graphics.RadialGradient(
+                850f, 260f, 650f,
+                intArrayOf(android.graphics.Color.argb(95, 56, 189, 248), android.graphics.Color.argb(45, 16, 185, 129), android.graphics.Color.TRANSPARENT),
+                floatArrayOf(0f, 0.5f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(850f, 260f, 650f, glowPaint)
+            val starPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(170, 255, 255, 255) }
+            val stars = listOf(140f to 110f, 320f to 85f, 540f to 140f, 760f to 95f, 950f to 160f, 210f to 240f, 890f to 310f, 640f to 210f)
+            stars.forEachIndexed { idx, (sx, sy) -> canvas.drawCircle(sx, sy, if (idx % 2 == 0) 3.5f else 2.2f, starPaint) }
+        }
+        StoryTheme.GLACIER_SNOW -> {
+            glowPaint.shader = android.graphics.RadialGradient(
+                900f, 220f, 620f,
+                intArrayOf(android.graphics.Color.argb(180, 255, 255, 255), android.graphics.Color.argb(60, 56, 189, 248), android.graphics.Color.TRANSPARENT),
+                floatArrayOf(0f, 0.5f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(900f, 220f, 620f, glowPaint)
+        }
+        StoryTheme.SUNSET_PEAK -> {
+            // Alpenglühen-Sonne hinter den Gipfeln
+            glowPaint.shader = android.graphics.RadialGradient(
+                540f, 1340f, 520f,
+                intArrayOf(android.graphics.Color.argb(210, 251, 191, 36), android.graphics.Color.argb(120, 244, 63, 94), android.graphics.Color.TRANSPARENT),
+                floatArrayOf(0f, 0.45f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(540f, 1340f, 520f, glowPaint)
+        }
+    }
+
+    // 3. Mehrschichtige Alpen-Silhouette mit Schneekämmen
+    fun drawMountainLayer(points: List<Pair<Float, Float>>, fillColor: Int, ridgeHighlight: Int? = null) {
         val path = android.graphics.Path().apply {
-            moveTo(0f, pathYBase)
-            lineTo(p1.x, p1.y)
-            lineTo(p2.x, p2.y)
-            lineTo(p3.x, p3.y)
-            lineTo(width.toFloat(), pathYBase)
+            moveTo(0f, height.toFloat())
+            lineTo(0f, points.first().second)
+            points.forEach { (px, py) -> lineTo(px, py) }
+            lineTo(width.toFloat(), points.last().second)
             lineTo(width.toFloat(), height.toFloat())
-            lineTo(0f, height.toFloat())
             close()
         }
-        canvas.drawPath(path, paint)
+        val mPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = fillColor
+            style = android.graphics.Paint.Style.FILL
+        }
+        canvas.drawPath(path, mPaint)
+
+        if (ridgeHighlight != null) {
+            val ridgePath = android.graphics.Path().apply {
+                moveTo(0f, points.first().second)
+                points.forEach { (px, py) -> lineTo(px, py) }
+            }
+            val rPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = ridgeHighlight
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 5f
+            }
+            canvas.drawPath(ridgePath, rPaint)
+        }
     }
 
-    val farMountainPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.mountainFar
-        style = android.graphics.Paint.Style.FILL
+    val (farCol, midCol, nearCol, ridgeCol) = when (theme) {
+        StoryTheme.ALPINE_DARK -> listOf(
+            android.graphics.Color.argb(140, 30, 41, 59),
+            android.graphics.Color.argb(200, 15, 23, 42),
+            android.graphics.Color.parseColor("#070B19"),
+            android.graphics.Color.argb(120, 56, 189, 248)
+        )
+        StoryTheme.GLACIER_SNOW -> listOf(
+            android.graphics.Color.argb(160, 125, 211, 252),
+            android.graphics.Color.argb(210, 56, 189, 248),
+            android.graphics.Color.parseColor("#0284C7"),
+            android.graphics.Color.argb(210, 255, 255, 255)
+        )
+        StoryTheme.SUNSET_PEAK -> listOf(
+            android.graphics.Color.argb(150, 88, 28, 92),
+            android.graphics.Color.argb(210, 49, 16, 63),
+            android.graphics.Color.parseColor("#1A0826"),
+            android.graphics.Color.argb(170, 251, 191, 36)
+        )
     }
-    drawMountain(1550f, android.graphics.PointF(280f, 1320f), android.graphics.PointF(640f, 1410f), android.graphics.PointF(920f, 1350f), farMountainPaint)
 
-    val nearMountainPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.mountainNear
-        style = android.graphics.Paint.Style.FILL
+    drawMountainLayer(listOf(0f to 1460f, 220f to 1310f, 430f to 1410f, 690f to 1270f, 920f to 1390f, 1080f to 1330f), farCol, ridgeCol)
+    drawMountainLayer(listOf(0f to 1560f, 180f to 1470f, 480f to 1360f, 760f to 1500f, 980f to 1420f, 1080f to 1480f), midCol, null)
+    drawMountainLayer(listOf(0f to 1680f, 290f to 1540f, 590f to 1650f, 860f to 1520f, 1080f to 1610f), nearCol, null)
+
+    // 4. Typografie & Glassmorphism-Karten
+    val textPrimary = if (isLight) android.graphics.Color.parseColor("#0F172A") else android.graphics.Color.WHITE
+    val textSecondary = if (isLight) android.graphics.Color.parseColor("#334155") else android.graphics.Color.parseColor("#CBD5E1")
+    val accent = when (theme) {
+        StoryTheme.ALPINE_DARK -> android.graphics.Color.parseColor("#38BDF8")
+        StoryTheme.GLACIER_SNOW -> android.graphics.Color.parseColor("#0284C7")
+        StoryTheme.SUNSET_PEAK -> android.graphics.Color.parseColor("#FBBF24")
     }
-    drawMountain(1700f, android.graphics.PointF(190f, 1500f), android.graphics.PointF(520f, 1580f), android.graphics.PointF(860f, 1470f), nearMountainPaint)
+    val cardBg = if (isLight) android.graphics.Color.argb(215, 255, 255, 255) else android.graphics.Color.argb(175, 15, 23, 42)
+    val cardBorder = if (isLight) android.graphics.Color.argb(160, 255, 255, 255) else android.graphics.Color.argb(110, 255, 255, 255)
 
+    // Top-Pill Badge
+    val pillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isLight) android.graphics.Color.argb(35, 2, 132, 199) else android.graphics.Color.argb(45, 255, 255, 255)
+    }
+    canvas.drawRoundRect(android.graphics.RectF(85f, 115f, 650f, 175f), 30f, 30f, pillPaint)
     val brandPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.accent
-        textSize = 34f
+        color = accent
+        textSize = 27f
         isFakeBoldText = true
         letterSpacing = 0.12f
     }
-    canvas.drawText("FREIZEITTICKET TRACKER", 90f, 190f, brandPaint)
+    canvas.drawText("⛷️ FREIZEITTICKET WRAPPED", 115f, 155f, brandPaint)
 
     val titlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textPrimary
-        textSize = 76f
+        color = textPrimary
+        textSize = 80f
         isFakeBoldText = true
     }
-    canvas.drawText("Saison-Rückblick", 90f, 280f, titlePaint)
+    canvas.drawText(if (personName.isNotBlank()) personName else "Saison-Rückblick", 85f, 265f, titlePaint)
 
     val subTitlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textSecondary
-        textSize = 38f
+        color = textSecondary
+        textSize = 36f
+        isFakeBoldText = true
     }
-    val nameTag = if (personName.isNotBlank()) " • $personName" else ""
-    canvas.drawText("Saison $season$nameTag", 90f, 340f, subTitlePaint)
+    canvas.drawText("Saison $season • Tirol & Osttirol", 85f, 325f, subTitlePaint)
 
     val cardPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.cardBg
+        color = cardBg
         style = android.graphics.Paint.Style.FILL
     }
     val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.cardBorder
+        color = cardBorder
         style = android.graphics.Paint.Style.STROKE
         strokeWidth = 3f
     }
-
-    val heroRect = android.graphics.RectF(90f, 430f, 990f, 940f)
-    canvas.drawRoundRect(heroRect, 38f, 38f, cardPaint)
-    canvas.drawRoundRect(heroRect, 38f, 38f, borderPaint)
-
     val labelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textSecondary
-        textSize = 28f
+        color = textSecondary
+        textSize = 26f
         letterSpacing = 0.1f
         isFakeBoldText = true
     }
-    canvas.drawText("EINGEFAHRENER GESAMTWERT", 140f, 510f, labelPaint)
 
+    // CARD 1: Hero Gesamtwert + Fortschritt
+    val heroRect = android.graphics.RectF(85f, 390f, 995f, 845f)
+    canvas.drawRoundRect(heroRect, 36f, 36f, cardPaint)
+    canvas.drawRoundRect(heroRect, 36f, 36f, borderPaint)
+
+    canvas.drawText("EINGEFAHRENER GESAMTWERT", 135f, 465f, labelPaint)
     val amountPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textPrimary
-        textSize = 92f
+        color = textPrimary
+        textSize = 98f
         isFakeBoldText = true
     }
-    canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), 140f, 620f, amountPaint)
+    canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), 135f, 575f, amountPaint)
 
     val isAmortized = ticketPrice > 0 && savedAmount >= ticketPrice
     val progressRatio = if (ticketPrice > 0) (savedAmount / ticketPrice).coerceIn(0.0, 1.0).toFloat() else 1.0f
     val percent = if (ticketPrice > 0) ((savedAmount / ticketPrice) * 100).toInt() else 100
 
-    val barLeft = 140f
-    val barRight = 940f
-    val barY = 700f
-    val barHeight = 22f
-
+    val barLeft = 135f
+    val barRight = 945f
+    val barY = 640f
+    val barHeight = 24f
     val trackPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.progressTrack
-        style = android.graphics.Paint.Style.FILL
+        color = if (isLight) android.graphics.Color.argb(40, 0, 0, 0) else android.graphics.Color.argb(65, 255, 255, 255)
     }
-    canvas.drawRoundRect(android.graphics.RectF(barLeft, barY, barRight, barY + barHeight), 11f, 11f, trackPaint)
+    canvas.drawRoundRect(android.graphics.RectF(barLeft, barY, barRight, barY + barHeight), 12f, 12f, trackPaint)
 
     val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isAmortized) android.graphics.Color.parseColor("#10B981") else visuals.accent
-        style = android.graphics.Paint.Style.FILL
+        color = if (isAmortized) android.graphics.Color.parseColor("#10B981") else accent
     }
     val fillWidth = (barRight - barLeft) * progressRatio
     if (fillWidth > 0) {
-        canvas.drawRoundRect(android.graphics.RectF(barLeft, barY, barLeft + fillWidth, barY + barHeight), 11f, 11f, fillPaint)
+        canvas.drawRoundRect(android.graphics.RectF(barLeft, barY, barLeft + fillWidth, barY + barHeight), 12f, 12f, fillPaint)
     }
 
     val statusText = if (isAmortized) {
         val gain = savedAmount - ticketPrice
-        "🎉 Break-Even erreicht! +${String.format(java.util.Locale.GERMAN, "%.2f €", gain)} Reingewinn ($percent%)"
+        "🔥 Break-Even geknackt! +${String.format(java.util.Locale.GERMAN, "%.2f €", gain)} Gewinn ($percent%)"
     } else {
         val remain = (ticketPrice - savedAmount).coerceAtLeast(0.0)
-        "Noch ${String.format(java.util.Locale.GERMAN, "%.2f €", remain)} bis zum Break-Even ($percent%)"
+        "Noch ${String.format(java.util.Locale.GERMAN, "%.2f €", remain)} bis Break-Even ($percent%)"
     }
-
     val statusPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isAmortized) android.graphics.Color.parseColor("#10B981") else visuals.accent
-        textSize = 34f
+        color = if (isAmortized) android.graphics.Color.parseColor("#10B981") else accent
+        textSize = 32f
         isFakeBoldText = true
     }
-    canvas.drawText(statusText, 140f, 800f, statusPaint)
+    canvas.drawText(statusText, 135f, 735f, statusPaint)
 
-    val statRect = android.graphics.RectF(90f, 990f, 990f, 1310f)
-    canvas.drawRoundRect(statRect, 38f, 38f, cardPaint)
-    canvas.drawRoundRect(statRect, 38f, 38f, borderPaint)
+    val ticketSubPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textSecondary
+        textSize = 28f
+    }
+    canvas.drawText("Ticketpreis: ${String.format(java.util.Locale.GERMAN, "%.2f €", ticketPrice)}", 135f, 795f, ticketSubPaint)
 
-    canvas.drawText("ABSOLVIERTE AUSFLÜGE", 140f, 1070f, labelPaint)
+    // CARD 2 (2 Spalten nebeneinander): Ausflüge & Ø Ersparnis/Tag
+    val leftRect = android.graphics.RectF(85f, 880f, 525f, 1145f)
+    val rightRect = android.graphics.RectF(555f, 880f, 995f, 1145f)
+    canvas.drawRoundRect(leftRect, 34f, 34f, cardPaint)
+    canvas.drawRoundRect(leftRect, 34f, 34f, borderPaint)
+    canvas.drawRoundRect(rightRect, 34f, 34f, cardPaint)
+    canvas.drawRoundRect(rightRect, 34f, 34f, borderPaint)
 
-    val countText = if (visitsCount == 1) "1 Ausflug" else "$visitsCount Ausflüge"
-    val countPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textPrimary
+    canvas.drawText("AUSFLÜGE", 125f, 945f, labelPaint)
+    val bigTilePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textPrimary
         textSize = 72f
         isFakeBoldText = true
     }
-    canvas.drawText(countText, 140f, 1175f, countPaint)
+    canvas.drawText("$visitsCount", 125f, 1035f, bigTilePaint)
+    canvas.drawText(if (visitsCount == 1) "Skitag / Trip" else "Tage draußen", 125f, 1095f, ticketSubPaint)
 
-    val countSubText = if (visitsCount > 0) {
-        val avg = savedAmount / visitsCount
-        "Ø Ersparnis: ${String.format(java.util.Locale.GERMAN, "%.2f €", avg)} pro Tag"
-    } else {
-        "Noch keine Ausflüge eingetragen"
-    }
-    val avgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textSecondary
-        textSize = 32f
-    }
-    canvas.drawText(countSubText, 140f, 1245f, avgPaint)
+    canvas.drawText("Ø WERT / TAG", 595f, 945f, labelPaint)
+    val avgPerDay = if (visitsCount > 0) savedAmount / visitsCount else 0.0
+    canvas.drawText(String.format(java.util.Locale.GERMAN, "%.0f €", avgPerDay), 595f, 1035f, bigTilePaint)
+    canvas.drawText("pro Besuchstag", 595f, 1095f, ticketSubPaint)
 
+    // CARD 3: Highlights (Top-Spot & Lieblingskategorie)
+    val highlightRect = android.graphics.RectF(85f, 1180f, 995f, 1455f)
+    canvas.drawRoundRect(highlightRect, 34f, 34f, cardPaint)
+    canvas.drawRoundRect(highlightRect, 34f, 34f, borderPaint)
+
+    canvas.drawText("TOP-FAVORIT DER SAISON", 135f, 1245f, labelPaint)
+    val highlightValPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textPrimary
+        textSize = 40f
+        isFakeBoldText = true
+    }
+    val clippedVenue = if (topVenueLabel.length > 30) topVenueLabel.take(28) + "…" else topVenueLabel
+    canvas.drawText("🏆 $clippedVenue", 135f, 1305f, highlightValPaint)
+
+    canvas.drawText("STÄRKSTE KATEGORIE: $topCategoryLabel", 135f, 1395f, statusPaint)
+
+    // Footer auf dunklem Vordergrund-Berg
     val footerPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = visuals.textSecondary
+        color = android.graphics.Color.WHITE
         textSize = 30f
+        isFakeBoldText = true
     }
-    canvas.drawText("🎿 Freizeitticket Tracker • Saison $season", 90f, 1820f, footerPaint)
+    canvas.drawText("🏔️ Freizeitticket Tracker • Saison $season", 90f, 1845f, footerPaint)
 
     return bitmap
 }
@@ -3472,6 +3540,8 @@ fun StoryPreviewCarouselDialog(
     visitsCount: Int,
     savedAmount: Double,
     ticketPrice: Double,
+    topVenueLabel: String = "–",
+    topCategoryLabel: String = "–",
     onDismiss: () -> Unit,
     onShare: (android.graphics.Bitmap) -> Unit
 ) {
@@ -3481,10 +3551,9 @@ fun StoryPreviewCarouselDialog(
         Pair(StoryTheme.SUNSET_PEAK, "Sunset Peak")
     )
 
-    // Rendern der drei Bitmaps im Speicher für verzögerungsfreie Vorschau
-    val bitmaps = remember(season, personName, visitsCount, savedAmount, ticketPrice) {
+    val bitmaps = remember(season, personName, visitsCount, savedAmount, ticketPrice, topVenueLabel, topCategoryLabel) {
         themes.map { (theme, _) ->
-            generateStoryBitmap(season, personName, visitsCount, savedAmount, ticketPrice, theme)
+            generateStoryBitmap(season, personName, visitsCount, savedAmount, ticketPrice, theme, topVenueLabel, topCategoryLabel)
         }
     }
 
@@ -3507,7 +3576,6 @@ fun StoryPreviewCarouselDialog(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header mit Titel und Schließen-Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -3524,7 +3592,6 @@ fun StoryPreviewCarouselDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // HorizontalPager für das Wischen durch die 3 Grafiken
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
@@ -3555,7 +3622,6 @@ fun StoryPreviewCarouselDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Theme-Name & Pager-Indikatorpunkte
                 Text(
                     text = themes[pagerState.currentPage].second,
                     color = Color.White,
@@ -3580,7 +3646,6 @@ fun StoryPreviewCarouselDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Button zum Teilen der aktuellen Auswahl
                 Button(
                     onClick = {
                         val chosenBitmap = bitmaps[pagerState.currentPage]
