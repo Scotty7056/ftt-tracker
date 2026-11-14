@@ -1837,203 +1837,169 @@ fun VenueDetailBottomSheet(
         containerColor = Color.White,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState())) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 1. Kompakter Header
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CategoryBadge(category = venue.category, size = 40.dp, emojiSize = 20.sp, cornerRadius = 12.dp)
+                CategoryBadge(category = venue.category, size = 38.dp, emojiSize = 19.sp, cornerRadius = 11.dp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AlpineDark)
-                    if (venue.subtitle.isNotEmpty()) Text(venue.subtitle, fontSize = 13.sp, color = Color.Gray)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text("Betriebs- & Pisteninformation", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-            Spacer(modifier = Modifier.height(8.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardSurface)) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Status", color = Color.Gray, fontSize = 13.sp)
-                        Text("● Regulärer Betrieb", color = EmeraldGain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Öffnungszeiten", color = Color.Gray, fontSize = 13.sp)
-                        Text("08:30 – 16:30 Uhr", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(if (venue.category == VenueCategory.SKI) "Schneelage (Berg/Tal)" else "Bedingungen", color = Color.Gray, fontSize = 13.sp)
-                        Text(if (venue.category == VenueCategory.SKI) "125 cm / 40 cm" else "Sehr gut präpariert", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE2E8F0))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Einzelticket (Normalpreis)", color = Color.Gray, fontSize = 13.sp)
-                        Text(effectivePrice.formatEuro(), fontWeight = FontWeight.Bold, color = GlacierBlue, fontSize = 14.sp)
+                    Text(venue.name, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = AlpineDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (venue.subtitle.isNotEmpty()) {
+                        Text(venue.subtitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text("Live-Wetter vor Ort (Open-Meteo)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-            Spacer(modifier = Modifier.height(8.dp))
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = GlacierBlue.copy(alpha = 0.08f))) {
-                if (isLoadingWeather) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = GlacierBlue, modifier = Modifier.size(28.dp))
-                    }
-                } else if (weatherData != null) {
-                    val w = weatherData!!
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${"%.1f".format(w.temperature_2m)} °C", fontSize = 24.sp, fontWeight = FontWeight.Black, color = AlpineDark)
-                            Text("Gefühlt ${"%.1f".format(w.apparent_temperature)} °C", fontSize = 11.sp, color = Color.Gray)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val condition = when (w.weather_code) {
-                                0 -> "☀️ Klar"
-                                1, 2, 3 -> "⛅ Leicht bewölkt"
-                                45, 48 -> "🌫️ Nebel"
-                                51, 53, 55, 61, 63, 65 -> "🌧️ Regen"
-                                71, 73, 75, 77, 85, 86 -> "❄️ Schneefall"
-                                else -> "☁️ Bedeckt"
-                            }
-                            Text(condition, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GlacierBlue)
-                            Text("Wind: ${"%.0f".format(w.wind_speed_10m)} km/h", fontSize = 11.sp, color = Color.Gray)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Feuchte", fontSize = 11.sp, color = Color.Gray)
-                            Text("${"%.0f".format(w.relative_humidity_2m)}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlpineDark)
-                        }
-                    }
-                } else {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        Text("Wetterdaten aktuell nicht abrufbar", fontSize = 12.sp, color = Color.Gray)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text("Besuchsdatum wählen", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AlpineDark)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showDatePicker = true },
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = CardSurface)
+            // 2. Schmale 1-Zeilen-Info (Betrieb + Wetter kompakt ohne Überschriften)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = CardSurface,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(14.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(GlacierBlue.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (venue.category == VenueCategory.SKI) "08:30–16:30 • 125/40 cm" else "08:30–16:30 • Geöffnet",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlpineDark
+                    )
+                    if (isLoadingWeather) {
+                        CircularProgressIndicator(color = GlacierBlue, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    } else if (weatherData != null) {
+                        val w = weatherData!!
+                        val cond = when (w.weather_code) {
+                            0 -> "☀️"
+                            1, 2, 3 -> "⛅"
+                            45, 48 -> "🌫️"
+                            51, 53, 55, 61, 63, 65 -> "🌧️"
+                            71, 73, 75, 77, 85, 86 -> "❄️"
+                            else -> "☁️"
+                        }
                         Text(
-                            text = if (selectedDate == LocalDate.now()) "Heute" else selectedDate.format(DateTimeFormatter.ofPattern("EEEE", Locale.GERMAN)),
-                            fontSize = 11.sp,
-                            color = Color.Gray
-                        )
-                        Text(
-                            text = selectedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yyyy", Locale.GERMAN)),
-                            fontSize = 14.sp,
+                            text = "$cond ${"%.1f".format(w.temperature_2m)}°C • ${"%.0f".format(w.wind_speed_10m)} km/h",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = AlpineDark
-                        )
-                        Text(
-                            text = "Zugeordnete Saison: ${getSeasonForDate(selectedDate)}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
                             color = GlacierBlue
                         )
                     }
-                    TextButton(onClick = { showDatePicker = true }) {
-                        Text("Datum ändern", fontSize = 12.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = priceText,
-                onValueChange = { input ->
-                    val sanitized = input.replace(',', '.')
-                    if (sanitized.isEmpty() || sanitized.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
-                        priceText = sanitized
-                    }
-                },
-                label = { Text("Angerechneter Tarif (€)") },
-                trailingIcon = { Text("€", modifier = Modifier.padding(end = 12.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+            // 3. Datum & Tarif nebeneinander in einer Zeile (spart ~130 dp Höhe)
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedCard(
+                    modifier = Modifier
+                        .weight(1.15f)
+                        .height(56.dp)
+                        .clickable { showDatePicker = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.outlinedCardColors(containerColor = CardSurface)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (selectedDate == LocalDate.now()) "Heute" else selectedDate.format(DateTimeFormatter.ofPattern("EEEE", Locale.GERMAN)),
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
+                            Text(
+                                text = selectedDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.GERMAN)),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AlpineDark
+                            )
+                        }
+                        Text("Ändern", fontSize = 11.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { input ->
+                        val sanitized = input.replace(',', '.')
+                        if (sanitized.isEmpty() || sanitized.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                            priceText = sanitized
+                        }
+                    },
+                    label = { Text("Tarif (€)", fontSize = 11.sp) },
+                    trailingIcon = { Text("€", modifier = Modifier.padding(end = 8.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
+                    modifier = Modifier.weight(0.85f),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+            }
 
             if (effectivePrice != (priceText.toDoubleOrNull() ?: 0.0)) {
                 Text(
-                    text = "Zur\u00FCcksetzen auf Standardtarif (${effectivePrice.formatEuro()})",
+                    text = "Standardtarif wiederherstellen (${effectivePrice.formatEuro()})",
                     fontSize = 11.sp,
                     color = GlacierBlue,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .clickable { priceText = String.format(Locale.US, "%.2f", effectivePrice) }
-                        .padding(top = 4.dp, start = 2.dp)
+                        .padding(start = 2.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
+            // 4. Einzeilige Notiz
             OutlinedTextField(
                 value = visitNotes,
                 onValueChange = { visitNotes = it },
-                placeholder = { Text("Optionale Notiz (z. B. 'Halbtageskarte ab 12h')", fontSize = 12.sp) },
+                placeholder = { Text("Optionale Notiz (z. B. Halbtageskarte)", fontSize = 12.sp) },
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
                 singleLine = true
             )
 
             val isAlreadyBookedOnDate = existingVisits.any { it.venueId == venue.id && it.date == selectedDate }
             if (isAlreadyBookedOnDate) {
-                Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = CoralWarning.copy(alpha = 0.12f)),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Warning, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Warning, contentDescription = null, tint = CoralWarning, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             "Bereits am ${selectedDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))} eingebucht!",
                             color = CoralWarning,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
+            // 5. Aktionsbuttons direkt sichtbar ohne Scrollen
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = onNavigateToMap,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(46.dp)
                 ) {
                     Icon(Icons.Rounded.Map, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -2056,7 +2022,7 @@ fun VenueDetailBottomSheet(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(46.dp)
                 ) {
                     Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
