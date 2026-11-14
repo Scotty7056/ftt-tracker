@@ -1069,14 +1069,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
         (effectiveSavedAmount - effectiveTicketPrice).coerceAtLeast(0.0)
     }
         val context = LocalContext.current
-                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-    val coroutineScope = rememberCoroutineScope()
 
 
     val categoryStats = remember(displayVisits) {
@@ -1230,9 +1222,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             }
         }
 
-            }
-        }
-    }
     if (showThemeChooserDialog) {
         val pName = selectedPerson?.name ?: ""
         StoryPreviewCarouselDialog(
