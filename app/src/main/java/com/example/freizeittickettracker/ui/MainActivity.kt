@@ -1776,35 +1776,22 @@ fun PartnerListView(
 @Composable
 fun VenueDetailBottomSheet(
     venue: Venue,
+    allPersons: List<PersonProfile> = emptyList(),
     existingVisits: List<VisitEntity> = emptyList(),
     onDismiss: () -> Unit,
     onNavigateToMap: () -> Unit,
-    onBookVisit: (LocalDate, Double, String) -> Unit
+    onBookVisit: (LocalDate, Double, String, List<Long>) -> Unit
 ) {
-        val context = LocalContext.current
-    var pendingCsvContent by remember { mutableStateOf<String?>(null) }
-    val csvExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        uri?.let { targetUri ->
-            pendingCsvContent?.let { content ->
-                try {
-                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
-                        stream.write(content.toByteArray(Charsets.UTF_8))
-                    }
-                    Toast.makeText(context, "\u2705 CSV erfolgreich gespeichert", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "\u274C Fehler beim Speichern", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
+    val context = LocalContext.current
     val effectivePrice = remember(venue) { PriceSyncManager.getCustomPrice(context, venue.id, venue.normalTicketPrice) }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var priceText by remember(effectivePrice) { mutableStateOf(String.format(Locale.US, "%.2f", effectivePrice)) }
     var visitNotes by remember { mutableStateOf("") }
     var showDuplicateWarning by remember { mutableStateOf(false) }
+    var selectedPersonIds by remember(allPersons) {
+        mutableStateOf(allPersons.filter { it.isDefaultSelected }.map { it.id }.toSet())
+    }
 
     var weatherData by remember { mutableStateOf<CurrentWeather?>(null) }
     var isLoadingWeather by remember { mutableStateOf(true) }
@@ -1856,7 +1843,7 @@ fun VenueDetailBottomSheet(
                 }
             }
 
-            // 2. Schmale 1-Zeilen-Info (Betrieb + Wetter kompakt ohne Überschriften)
+            // 2. Schmale 1-Zeilen-Info (Betrieb + Wetter)
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = CardSurface,
@@ -1895,43 +1882,33 @@ fun VenueDetailBottomSheet(
                 }
             }
 
-            // 3. Datum & Tarif nebeneinander in einer Zeile (spart ~130 dp Höhe)
+            // 3. Harmonische 50/50-Reihe: Datum & Tarif im identischen OutlinedTextField-Look
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedCard(
-                    modifier = Modifier
-                        .weight(1.15f)
-                        .height(56.dp)
-                        .clickable { showDatePicker = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.outlinedCardColors(containerColor = CardSurface)
-                ) {
-                    Row(
+                Box(modifier = Modifier.weight(1.1f)) {
+                    OutlinedTextField(
+                        value = selectedDate.format(DateTimeFormatter.ofPattern("EEE, dd.MM.yy", Locale.GERMAN)),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Datum", fontSize = 11.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AlpineDark)
+                    )
+                    // Transparente Klickfläche über dem readOnly TextField öffnet zuverlässig den DatePicker
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (selectedDate == LocalDate.now()) "Heute" else selectedDate.format(DateTimeFormatter.ofPattern("EEEE", Locale.GERMAN)),
-                                fontSize = 10.sp,
-                                color = Color.Gray
-                            )
-                            Text(
-                                text = selectedDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.GERMAN)),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AlpineDark
-                            )
-                        }
-                        Text("Ändern", fontSize = 11.sp, color = GlacierBlue, fontWeight = FontWeight.Bold)
-                    }
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showDatePicker = true }
+                    )
                 }
 
                 OutlinedTextField(
@@ -1944,9 +1921,10 @@ fun VenueDetailBottomSheet(
                     },
                     label = { Text("Tarif (€)", fontSize = 11.sp) },
                     trailingIcon = { Text("€", modifier = Modifier.padding(end = 8.dp), fontWeight = FontWeight.Bold, color = GlacierBlue) },
-                    modifier = Modifier.weight(0.85f),
+                    modifier = Modifier.weight(0.9f),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AlpineDark)
                 )
             }
 
@@ -1972,6 +1950,21 @@ fun VenueDetailBottomSheet(
                 singleLine = true
             )
 
+            // 5. Personenauswahl (FamilyCheckInSelector)
+            if (allPersons.isNotEmpty()) {
+                FamilyCheckInSelector(
+                    allPersons = allPersons,
+                    selectedPersonIds = selectedPersonIds,
+                    onTogglePerson = { pId ->
+                        selectedPersonIds = if (selectedPersonIds.contains(pId)) {
+                            selectedPersonIds - pId
+                        } else {
+                            selectedPersonIds + pId
+                        }
+                    }
+                )
+            }
+
             val isAlreadyBookedOnDate = existingVisits.any { it.venueId == venue.id && it.date == selectedDate }
             if (isAlreadyBookedOnDate) {
                 Card(
@@ -1992,7 +1985,7 @@ fun VenueDetailBottomSheet(
                 }
             }
 
-            // 5. Aktionsbuttons direkt sichtbar ohne Scrollen
+            // 6. Aktionsbuttons
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = onNavigateToMap,
@@ -2013,7 +2006,7 @@ fun VenueDetailBottomSheet(
                         } else {
                             val finalPrice = priceText.toDoubleOrNull() ?: effectivePrice
                             val finalNote = if (visitNotes.isNotBlank()) visitNotes.trim() else "Über Partneransicht erfasst"
-                            onBookVisit(selectedDate, finalPrice, finalNote)
+                            onBookVisit(selectedDate, finalPrice, finalNote, selectedPersonIds.toList())
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
