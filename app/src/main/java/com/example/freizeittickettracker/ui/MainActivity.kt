@@ -868,13 +868,12 @@ fun DashboardView(
 // ==========================================
 // 2. STATISTIKEN, EXPORT & IMPORT
 // ==========================================
-enum class StoryTheme(val title: String, val subtitle: String, val categoryTag: String) {
-    RING_NEON("Neon Summit", "Ring-Chart & Bold Typo", "TYPO & RING"),
-    RING_GLACIER("Glacier Minimal", "Heller Editorial-Look", "TYPO & RING"),
-    RING_SUNSET("Alpenglow Ring", "Gold & Magenta Kontrast", "TYPO & RING"),
-    POSTER_RETRO("Retro Ski-Poster", "Vintage Alpen-Illustration", "ALPEN-POSTER"),
-    POSTER_AURORA("Midnight Aurora", "Polarlicht & Gipfelkette", "ALPEN-POSTER"),
-    POSTER_GOLDEN("Golden Peak", "Alpenglühen Illustration", "ALPEN-POSTER")
+enum class StoryTheme(val title: String, val subtitle: String, val categoryTag: String, val resName: String) {
+    POSTER_SKI("Ski-Klassiker", "Vintage Alpenplakat", "WINTERSPORT", "story_bg_ski"),
+    POSTER_POWDER("Deep Powder", "Epic Freeride-Action", "FREERIDE", "story_bg_powder"),
+    POSTER_AURORA("Aurora Magic", "Nordlichter & Gipfel", "KOSMISCH", "story_bg_aurora"),
+    POSTER_RODEL("Rodel-Gaudi", "Naturrodelbahn-Spaß", "RODELN", "story_bg_rodel"),
+    POSTER_SUMMER("Bergsee-Sommer", "Erfrischendes Abenteuer", "SOMMER", "story_bg_summer")
 }
 
 data class StoryColors(
@@ -3240,6 +3239,7 @@ fun StoryThemeChooserDialog(
 }
 
 fun generateStoryBitmap(
+    context: android.content.Context,
     season: String,
     personName: String,
     visitsCount: Int,
@@ -3254,409 +3254,209 @@ fun generateStoryBitmap(
     val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
 
+    // A. Hintergrundbild aus resources laden
+    val resId = context.resources.getIdentifier(theme.resName, "drawable", context.packageName)
+    var bgLoaded = false
+    if (resId != 0) {
+        try {
+            val options = android.graphics.BitmapFactory.Options().apply {
+                inScaled = false
+                inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+            }
+            val originalBg = android.graphics.BitmapFactory.decodeResource(context.resources, resId, options)
+            if (originalBg != null) {
+                val destRect = android.graphics.Rect(0, 0, width, height)
+                canvas.drawBitmap(originalBg, null, destRect, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                originalBg.recycle()
+                bgLoaded = true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("FTT_STORY", "Fehler beim Laden des Hintergrunds: ${theme.resName}", e)
+        }
+    }
+
+    // Fallback: Sanfter Gradient, falls das Bild nicht geladen werden konnte
+    if (!bgLoaded) {
+        val fbGradient = android.graphics.Paint().apply {
+            shader = android.graphics.LinearGradient(
+                0f, 0f, 0f, height.toFloat(),
+                android.graphics.Color.parseColor("#121829"),
+                android.graphics.Color.parseColor("#060913"),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fbGradient)
+    }
+
+    // Text & Information Overlay
     val isAmortized = ticketPrice > 0 && savedAmount >= ticketPrice
-    val progressRatio = if (ticketPrice > 0) (savedAmount / ticketPrice).coerceIn(0.0, 1.0).toFloat() else 1.0f
     val percent = if (ticketPrice > 0) ((savedAmount / ticketPrice) * 100).toInt() else 100
     val avgPerDay = if (visitsCount > 0) savedAmount / visitsCount else 0.0
-    val cleanVenue = topVenueLabel.replace(Regex("""\s*\(\d+x\)$"""), "").let { if (it.length > 24) it.take(22) + "…" else it }
+    val cleanVenue = topVenueLabel.replace(Regex("""\s*\(\d+x\)$"""), "").let { if (it.length > 25) it.take(23) + "…" else it }
     val cleanCat = topCategoryLabel.replace(Regex("""^[^\p{L}\p{N}]+\s*"""), "")
 
-    val isRingStyle = theme == StoryTheme.RING_NEON || theme == StoryTheme.RING_GLACIER || theme == StoryTheme.RING_SUNSET
+    // Farbstile & Lesbarkeits-Schatten (Scrims)
+    val textPrimary = android.graphics.Color.WHITE
+    val textMuted = android.graphics.Color.parseColor("#94A3B8") // Slate 400
+    val accentGold = android.graphics.Color.parseColor("#FBBF24") // Amber 400
+    val accentTeal = android.graphics.Color.parseColor("#34D399") // Emerald 400
 
-    if (isRingStyle) {
-        // =========================================================================
-        // VARIANTE 1: PLAKATIVES TYPO- & DONUT-RING-DESIGN (OHNE KÄSTEN / EMOJIS)
-        // =========================================================================
-        val isLight = theme == StoryTheme.RING_GLACIER
-        data class RingPalette(
-            val bgTop: Int, val bgBot: Int, val glowCol: Int,
-            val ringAccent: Int, val ringSecondary: Int,
-            val textMain: Int, val textSub: Int, val lineCol: Int
+    // Dunkler Vignette-Verlauf für perfekten Kontrast (oben & unten intensiviert)
+    val scrimPaint = android.graphics.Paint().apply {
+        shader = android.graphics.LinearGradient(
+            0f, 0f, 0f, 650f,
+            android.graphics.Color.argb(220, 10, 15, 30),
+            android.graphics.Color.TRANSPARENT,
+            android.graphics.Shader.TileMode.CLAMP
         )
-        val rp = when (theme) {
-            StoryTheme.RING_NEON -> RingPalette(
-                android.graphics.Color.parseColor("#05070F"),
-                android.graphics.Color.parseColor("#0B1120"),
-                android.graphics.Color.argb(115, 16, 185, 129),
-                android.graphics.Color.parseColor("#38BDF8"),
-                android.graphics.Color.parseColor("#34D399"),
-                android.graphics.Color.WHITE,
-                android.graphics.Color.parseColor("#94A3B8"),
-                android.graphics.Color.argb(45, 255, 255, 255)
-            )
-            StoryTheme.RING_GLACIER -> RingPalette(
-                android.graphics.Color.parseColor("#F8FAFC"),
-                android.graphics.Color.parseColor("#E0F2FE"),
-                android.graphics.Color.argb(130, 56, 189, 248),
-                android.graphics.Color.parseColor("#0284C7"),
-                android.graphics.Color.parseColor("#0D9488"),
-                android.graphics.Color.parseColor("#0F172A"),
-                android.graphics.Color.parseColor("#475569"),
-                android.graphics.Color.argb(35, 15, 23, 42)
-            )
-            else -> RingPalette(
-                android.graphics.Color.parseColor("#14071E"),
-                android.graphics.Color.parseColor("#2E0927"),
-                android.graphics.Color.argb(135, 244, 63, 94),
-                android.graphics.Color.parseColor("#FBBF24"),
-                android.graphics.Color.parseColor("#FB7185"),
-                android.graphics.Color.WHITE,
-                android.graphics.Color.parseColor("#FBCFE8"),
-                android.graphics.Color.argb(45, 255, 255, 255)
-            )
-        }
-        val bgTop = rp.bgTop; val bgBot = rp.bgBot; val glowCol = rp.glowCol
-        val ringAccent = rp.ringAccent; val ringSecondary = rp.ringSecondary
-        val textMain = rp.textMain; val textSub = rp.textSub; val lineCol = rp.lineCol
-
-        // Hintergrund & subtiler Aura-Glow hinter dem Ring
-        val bgPaint = android.graphics.Paint().apply {
-            shader = android.graphics.LinearGradient(0f, 0f, 0f, height.toFloat(), bgTop, bgBot, android.graphics.Shader.TileMode.CLAMP)
-        }
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-
-        val auraPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            shader = android.graphics.RadialGradient(540f, 690f, 470f, intArrayOf(glowCol, android.graphics.Color.TRANSPARENT), floatArrayOf(0f, 1f), android.graphics.Shader.TileMode.CLAMP)
-        }
-        canvas.drawCircle(540f, 690f, 470f, auraPaint)
-
-        // Feines topografisches Linien-Raster im Hintergrund
-        val gridPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = lineCol
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = 2f
-        }
-        for (gx in listOf(90f, 540f, 990f)) {
-            canvas.drawLine(gx, 90f, gx, 1780f, gridPaint)
-        }
-
-        // Top Header (Editorial Magazin-Stil)
-        val tagPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ringAccent
-            textSize = 26f
-            isFakeBoldText = true
-            letterSpacing = 0.18f
-        }
-        canvas.drawText("FREIZEITTICKET WRAPPED  /  $season", 90f, 145f, tagPaint)
-
-        val heroNamePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textMain
-            textSize = 96f
-            isFakeBoldText = true
-            letterSpacing = -0.03f
-        }
-        canvas.drawText(if (personName.isNotBlank()) personName else "Saison-Bilanz", 86f, 250f, heroNamePaint)
-
-        // Großer Leucht-Donut-Ring für Amortisation
-        val cx = 540f
-        val cy = 670f
-        val radius = 265f
-        val strokeW = 44f
-        val oval = android.graphics.RectF(cx - radius, cy - radius, cx + radius, cy + radius)
-
-        val ringTrackPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isLight) android.graphics.Color.argb(30, 15, 23, 42) else android.graphics.Color.argb(40, 255, 255, 255)
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = strokeW
-        }
-        canvas.drawOval(oval, ringTrackPaint)
-
-        val ringFillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            shader = android.graphics.SweepGradient(cx, cy, intArrayOf(ringAccent, ringSecondary, ringAccent), null)
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = strokeW
-            strokeCap = android.graphics.Paint.Cap.ROUND
-        }
-        canvas.save()
-        canvas.rotate(-90f, cx, cy)
-        canvas.drawArc(oval, 0f, 360f * progressRatio, false, ringFillPaint)
-        canvas.restore()
-
-        // Prozentzahl & Label zentriert im Ring
-        val pctPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textMain
-            textSize = 112f
-            isFakeBoldText = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            letterSpacing = -0.03f
-        }
-        canvas.drawText("$percent%", cx, cy + 28f, pctPaint)
-
-        val ringSubPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ringSecondary
-            textSize = 26f
-            isFakeBoldText = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            letterSpacing = 0.14f
-        }
-        canvas.drawText(if (isAmortized) "AMORTISIERT" else "TICKET-ZIEL", cx, cy + 82f, ringSubPaint)
-
-        // Plakative Gesamtersparnis direkt unter dem Ring (ohne Kasten)
-        val amountCenterPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textMain
-            textSize = 116f
-            isFakeBoldText = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            letterSpacing = -0.03f
-        }
-        canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), cx, 1110f, amountCenterPaint)
-
-        val deltaLine = if (isAmortized) {
-            val plus = savedAmount - ticketPrice
-            "REINGEWINN: +${String.format(java.util.Locale.GERMAN, "%.2f €", plus)}  •  TICKET ${String.format(java.util.Locale.GERMAN, "%.0f €", ticketPrice)}"
-        } else {
-            val rest = (ticketPrice - savedAmount).coerceAtLeast(0.0)
-            "NOCH ${String.format(java.util.Locale.GERMAN, "%.2f €", rest)} BIS BREAK-EVEN  •  TICKET ${String.format(java.util.Locale.GERMAN, "%.0f €", ticketPrice)}"
-        }
-        val deltaPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textSub
-            textSize = 27f
-            isFakeBoldText = true
-            textAlign = android.graphics.Paint.Align.CENTER
-            letterSpacing = 0.08f
-        }
-        canvas.drawText(deltaLine, cx, 1168f, deltaPaint)
-
-        // Saubere Kennzahlen-Zeilen mit Haarlinien (Editorial Table statt Boxen)
-        val dividerPaint = android.graphics.Paint().apply { color = lineCol; strokeWidth = 2f }
-        canvas.drawLine(90f, 1235f, 990f, 1235f, dividerPaint)
-
-        val colLabelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textSub
-            textSize = 24f
-            isFakeBoldText = true
-            letterSpacing = 0.12f
-        }
-        val colValPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textMain
-            textSize = 54f
-            isFakeBoldText = true
-            letterSpacing = -0.02f
-        }
-
-        canvas.drawText("AUSFLÜGE", 90f, 1290f, colLabelPaint)
-        canvas.drawText("$visitsCount Tage", 90f, 1358f, colValPaint)
-
-        canvas.drawText("Ø WERT / TAG", 560f, 1290f, colLabelPaint)
-        canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", avgPerDay), 560f, 1358f, colValPaint)
-
-        canvas.drawLine(90f, 1405f, 990f, 1405f, dividerPaint)
-
-        canvas.drawText("TOP-FAVORIT", 90f, 1460f, colLabelPaint)
-        val spotValPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textMain
-            textSize = 46f
-            isFakeBoldText = true
-            letterSpacing = -0.02f
-        }
-        canvas.drawText(cleanVenue, 90f, 1522f, spotValPaint)
-
-        // Vektor-Höhenprofil-Kurve als künstlerischer Abschluss unten
-        val elevationPath = android.graphics.Path().apply {
-            moveTo(90f, 1730f)
-            cubicTo(260f, 1710f, 320f, 1600f, 470f, 1630f)
-            cubicTo(620f, 1660f, 740f, 1545f, 990f, 1590f)
-        }
-        val elevPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            shader = android.graphics.LinearGradient(90f, 0f, 990f, 0f, ringAccent, ringSecondary, android.graphics.Shader.TileMode.CLAMP)
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = 6f
-            strokeCap = android.graphics.Paint.Cap.ROUND
-        }
-        canvas.drawPath(elevationPath, elevPaint)
-
-        val footerPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = textSub
-            textSize = 25f
-            isFakeBoldText = true
-            letterSpacing = 0.12f
-        }
-        canvas.drawText("FREIZEITTICKET TRACKER  •  TIROL & OSTTIROL", 90f, 1835f, footerPaint)
-
-    } else {
-        // =========================================================================
-        // VARIANTE 2: ILLUSTRIERTE ALPEN-POSTER (3 VINTAGE / MODERN VECTOR POSTERS)
-        // =========================================================================
-        data class PosterStyle(
-            val skyTop: Int,
-            val skyBot: Int,
-            val sunColor: Int,
-            val sunGlow: Int,
-            val mtnFar: Int,
-            val mtnMid: Int,
-            val mtnNear: Int,
-            val snowHighlight: Int,
-            val slopeRibbon: Int,
-            val scrimTop: Int,
-            val textHero: Int,
-            val textMuted: Int,
-            val accent: Int
-        )
-
-        val ps = when (theme) {
-            StoryTheme.POSTER_RETRO -> PosterStyle(
-                skyTop = android.graphics.Color.parseColor("#0F2942"),
-                skyBot = android.graphics.Color.parseColor("#2A6F97"),
-                sunColor = android.graphics.Color.parseColor("#FDE68A"),
-                sunGlow = android.graphics.Color.argb(110, 253, 230, 138),
-                mtnFar = android.graphics.Color.parseColor("#1D4E73"),
-                mtnMid = android.graphics.Color.parseColor("#133854"),
-                mtnNear = android.graphics.Color.parseColor("#091E32"),
-                snowHighlight = android.graphics.Color.parseColor("#E0F2FE"),
-                slopeRibbon = android.graphics.Color.argb(215, 248, 250, 252),
-                scrimTop = android.graphics.Color.argb(150, 9, 30, 50),
-                textHero = android.graphics.Color.WHITE,
-                textMuted = android.graphics.Color.parseColor("#BAE6FD"),
-                accent = android.graphics.Color.parseColor("#FBBF24")
-            )
-            StoryTheme.POSTER_AURORA -> PosterStyle(
-                skyTop = android.graphics.Color.parseColor("#030712"),
-                skyBot = android.graphics.Color.parseColor("#064E3B"),
-                sunColor = android.graphics.Color.parseColor("#34D399"),
-                sunGlow = android.graphics.Color.argb(120, 16, 185, 129),
-                mtnFar = android.graphics.Color.parseColor("#0F292E"),
-                mtnMid = android.graphics.Color.parseColor("#091A24"),
-                mtnNear = android.graphics.Color.parseColor("#030712"),
-                snowHighlight = android.graphics.Color.parseColor("#6EE7B7"),
-                slopeRibbon = android.graphics.Color.argb(170, 52, 211, 153),
-                scrimTop = android.graphics.Color.argb(155, 3, 7, 18),
-                textHero = android.graphics.Color.WHITE,
-                textMuted = android.graphics.Color.parseColor("#A7F3D0"),
-                accent = android.graphics.Color.parseColor("#34D399")
-            )
-            else -> PosterStyle(
-                skyTop = android.graphics.Color.parseColor("#2B0928"),
-                skyBot = android.graphics.Color.parseColor("#C2410C"),
-                sunColor = android.graphics.Color.parseColor("#FEF08A"),
-                sunGlow = android.graphics.Color.argb(145, 251, 146, 60),
-                mtnFar = android.graphics.Color.parseColor("#7C2D12"),
-                mtnMid = android.graphics.Color.parseColor("#431427"),
-                mtnNear = android.graphics.Color.parseColor("#1C0716"),
-                snowHighlight = android.graphics.Color.parseColor("#FDBA74"),
-                slopeRibbon = android.graphics.Color.argb(195, 254, 215, 170),
-                scrimTop = android.graphics.Color.argb(145, 28, 7, 22),
-                textHero = android.graphics.Color.WHITE,
-                textMuted = android.graphics.Color.parseColor("#FED7AA"),
-                accent = android.graphics.Color.parseColor("#FDE047")
-            )
-        }
-
-        // 1. Poster-Himmel
-        val skyPaint = android.graphics.Paint().apply {
-            shader = android.graphics.LinearGradient(0f, 0f, 0f, 1450f, ps.skyTop, ps.skyBot, android.graphics.Shader.TileMode.CLAMP)
-        }
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), skyPaint)
-
-        // 2. Große Poster-Sonne / Mond hinter dem Hauptmassiv
-        val sunX = 760f
-        val sunY = 960f
-        val sunHaloPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            shader = android.graphics.RadialGradient(sunX, sunY, 390f, intArrayOf(ps.sunGlow, android.graphics.Color.TRANSPARENT), floatArrayOf(0f, 1f), android.graphics.Shader.TileMode.CLAMP)
-        }
-        canvas.drawCircle(sunX, sunY, 390f, sunHaloPaint)
-        val sunCorePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = ps.sunColor }
-        canvas.drawCircle(sunX, sunY, 185f, sunCorePaint)
-
-        // 3. Drei gestaffelte Alpen-Massiv-Ebenen mit beleuchteten Grat-Flanken
-        fun drawRidge(pts: List<Pair<Float, Float>>, baseColor: Int) {
-            val path = android.graphics.Path().apply {
-                moveTo(0f, height.toFloat())
-                pts.forEach { (x, y) -> lineTo(x, y) }
-                lineTo(width.toFloat(), height.toFloat())
-                close()
-            }
-            canvas.drawPath(path, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = baseColor })
-        }
-
-        drawRidge(listOf(0f to 1180f, 190f to 980f, 380f to 1110f, 640f to 870f, 890f to 1080f, 1080f to 960f), ps.mtnFar)
-
-        // Lichtflanke auf dem Hauptgipfel (640, 870)
-        val facetPath = android.graphics.Path().apply {
-            moveTo(640f, 870f)
-            lineTo(890f, 1080f)
-            lineTo(710f, 1140f)
-            close()
-        }
-        canvas.drawPath(facetPath, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = ps.snowHighlight; alpha = 150 })
-
-        drawRidge(listOf(0f to 1320f, 270f to 1120f, 520f to 1260f, 820f to 1060f, 1080f to 1210f), ps.mtnMid)
-
-        // Geschwungene Abfahrts-Schneise (Ski-Trail) über den Mittelhang
-        val trailPath = android.graphics.Path().apply {
-            moveTo(815f, 1075f)
-            cubicTo(690f, 1180f, 860f, 1270f, 560f, 1380f)
-            cubicTo(340f, 1460f, 490f, 1560f, 240f, 1660f)
-            lineTo(340f, 1680f)
-            cubicTo(590f, 1570f, 440f, 1470f, 650f, 1390f)
-            cubicTo(930f, 1280f, 740f, 1185f, 825f, 1080f)
-            close()
-        }
-        canvas.drawPath(trailPath, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = ps.slopeRibbon })
-
-        drawRidge(listOf(0f to 1540f, 310f to 1410f, 640f to 1560f, 930f to 1430f, 1080f to 1510f), ps.mtnNear)
-
-        // 4. Sanfter Lesbarkeits-Scrim oben für kristallklare Poster-Typografie
-        val scrimPaint = android.graphics.Paint().apply {
-            shader = android.graphics.LinearGradient(0f, 0f, 0f, 920f, ps.scrimTop, android.graphics.Color.TRANSPARENT, android.graphics.Shader.TileMode.CLAMP)
-        }
-        canvas.drawRect(0f, 0f, width.toFloat(), 920f, scrimPaint)
-
-        // 5. Poster-Typografie (ohne jegliche Boxen)
-        val pTagPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ps.accent
-            textSize = 28f
-            isFakeBoldText = true
-            letterSpacing = 0.2f
-        }
-        canvas.drawText("TIROL & OSTTIROL  •  $season", 85f, 150f, pTagPaint)
-
-        val pNamePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ps.textHero
-            textSize = 102f
-            isFakeBoldText = true
-            letterSpacing = -0.03f
-        }
-        canvas.drawText(if (personName.isNotBlank()) personName else "Saison-Edition", 82f, 260f, pNamePaint)
-
-        val pValuePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ps.textHero
-            textSize = 132f
-            isFakeBoldText = true
-            letterSpacing = -0.03f
-        }
-        canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), 80f, 430f, pValuePaint)
-
-        val pSubPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ps.accent
-            textSize = 32f
-            isFakeBoldText = true
-            letterSpacing = 0.08f
-        }
-        val posterStatus = if (isAmortized) {
-            "BREAK-EVEN ERREICHT ($percent%)  •  +${String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount - ticketPrice)}"
-        } else {
-            "$percent% AMORTISIERT  •  $visitsCount AUSFLÜGE"
-        }
-        canvas.drawText(posterStatus, 85f, 495f, pSubPaint)
-
-        // Kompakte Poster-Faktenzeile direkt unter dem Subtitel
-        val pMetaPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = ps.textMuted
-            textSize = 32f
-            isFakeBoldText = true
-        }
-        canvas.drawText("$visitsCount Tage draußen  •  Ø ${String.format(java.util.Locale.GERMAN, "%.0f €", avgPerDay)}/Tag", 85f, 560f, pMetaPaint)
-        canvas.drawText("Favorit: $cleanVenue  •  $cleanCat", 85f, 612f, pMetaPaint)
-
-        // Poster-Footer unten im dunklen Bergmassiv
-        val pFooterPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.WHITE
-            textSize = 28f
-            isFakeBoldText = true
-            letterSpacing = 0.14f
-        }
-        canvas.drawText("FREIZEITTICKET TRACKER  •  $season", 85f, 1840f, pFooterPaint)
     }
+    canvas.drawRect(0f, 0f, width.toFloat(), 650f, scrimPaint)
+
+    val bottomScrim = android.graphics.Paint().apply {
+        shader = android.graphics.LinearGradient(
+            0f, 1600f, 0f, height.toFloat(),
+            android.graphics.Color.TRANSPARENT,
+            android.graphics.Color.argb(160, 10, 15, 30),
+            android.graphics.Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawRect(0f, 1600f, width.toFloat(), height.toFloat(), bottomScrim)
+
+    // Schatten-Effekte für Premium-Lesbarkeit
+    val textShadow = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textPrimary
+        setShadowLayer(14f, 0f, 6f, android.graphics.Color.argb(210, 0, 0, 0))
+    }
+
+    // 1. Badge & Header (Oben)
+    val brandPaint = android.graphics.Paint(textShadow).apply {
+        color = accentGold
+        textSize = 28f
+        isFakeBoldText = true
+        letterSpacing = 0.16f
+    }
+    canvas.drawText("FREIZEITTICKET WRAPPED  /  $season", 90f, 140f, brandPaint)
+
+    val namePaint = android.graphics.Paint(textShadow).apply {
+        textSize = 94f
+        isFakeBoldText = true
+        letterSpacing = -0.02f
+    }
+    canvas.drawText(if (personName.isNotBlank()) personName else "Meine Bilanz", 86f, 245f, namePaint)
+
+    // 2. Große Gesamt-Ersparnis (Riesig, plakativ & elegant schattiert)
+    val valLabelPaint = android.graphics.Paint(textShadow).apply {
+        color = textMuted
+        textSize = 28f
+        isFakeBoldText = true
+        letterSpacing = 0.15f
+    }
+    canvas.drawText("EINGEFAHRENER GEGENWERT", 90f, 345f, valLabelPaint)
+
+    val valAmountPaint = android.graphics.Paint(textShadow).apply {
+        textSize = 152f
+        isFakeBoldText = true
+        letterSpacing = -0.03f
+    }
+    canvas.drawText(String.format(java.util.Locale.GERMAN, "%.2f €", savedAmount), 82f, 495f, valAmountPaint)
+
+    // 3. Status & Amortisation
+    val statusText = if (isAmortized) {
+        val gain = savedAmount - ticketPrice
+        "🔥 TICKET AMORTISIERT!  •  +${String.format(java.util.Locale.GERMAN, "%.2f €", gain)} PLUS ($percent%)"
+    } else {
+        val remain = (ticketPrice - savedAmount).coerceAtLeast(0.0)
+        "🚀 $percent% AMORTISIERT  •  NOCH ${String.format(java.util.Locale.GERMAN, "%.2f €", remain)}"
+    }
+    val statusPaint = android.graphics.Paint(textShadow).apply {
+        color = if (isAmortized) accentTeal else accentGold
+        textSize = 31f
+        isFakeBoldText = true
+        letterSpacing = 0.06f
+    }
+    canvas.drawText(statusText, 90f, 555f, statusPaint)
+
+    // 4. Edle Glassmorphismus-Bento-Karten für Statistiken (Weicher Blur/Overlay-Look)
+    val cardPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(165, 12, 18, 38) // Transluzentes Navy-Dunkel
+        style = android.graphics.Paint.Style.FILL
+    }
+    val cardBorder = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(55, 255, 255, 255) // Hauchdünne Glanzkante
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = 2.5f
+    }
+
+    // Linke Spalte: Ausflüge
+    val rectLeft = android.graphics.RectF(90f, 1180f, 510f, 1445f)
+    canvas.drawRoundRect(rectLeft, 24f, 24f, cardPaint)
+    canvas.drawRoundRect(rectLeft, 24f, 24f, cardBorder)
+
+    // Rechte Spalte: Schnitt pro Tag
+    val rectRight = android.graphics.RectF(550f, 1180f, 990f, 1445f)
+    canvas.drawRoundRect(rectRight, 24f, 24f, cardPaint)
+    canvas.drawRoundRect(rectRight, 24f, 24f, cardBorder)
+
+    // Volle Breite unten: Top-Spot & Favoriten
+    val rectFull = android.graphics.RectF(90f, 1485f, 990f, 1720f)
+    canvas.drawRoundRect(rectFull, 24f, 24f, cardPaint)
+    canvas.drawRoundRect(rectFull, 24f, 24f, cardBorder)
+
+    // Text-Labels und Inhalte auf den Glaskarten
+    val labelInCard = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textMuted
+        textSize = 25f
+        isFakeBoldText = true
+        letterSpacing = 0.08f
+    }
+    val valueInCardBig = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textPrimary
+        textSize = 76f
+        isFakeBoldText = true
+        letterSpacing = -0.01f
+    }
+    val subInCard = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textPrimary
+        alpha = 180
+        textSize = 28f
+    }
+
+    // Linke Karte bespielen
+    canvas.drawText("AUSFLÜGE", 130f, 1240f, labelInCard)
+    canvas.drawText("$visitsCount", 130f, 1335f, valueInCardBig)
+    canvas.drawText("Tage am Berg", 130f, 1395f, subInCard)
+
+    // Rechte Karte bespielen
+    canvas.drawText("Ø WERT / TAG", 590f, 1240f, labelInCard)
+    canvas.drawText(String.format(java.util.Locale.GERMAN, "%.0f €", avgPerDay), 590f, 1335f, valueInCardBig)
+    canvas.drawText("Ersparnis je Trip", 590f, 1395f, subInCard)
+
+    // Untere Großkarte bespielen
+    canvas.drawText("TOP-SPOT DER SAISON", 130f, 1540f, labelInCard)
+
+    val spotTitlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = textPrimary
+        textSize = 46f
+        isFakeBoldText = true
+    }
+    canvas.drawText("🏆 $cleanVenue", 130f, 1610f, spotTitlePaint)
+
+    val spotSubPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentGold
+        textSize = 28f
+        isFakeBoldText = true
+    }
+    canvas.drawText("Hauptkategorie: $cleanCat", 130f, 1675f, spotSubPaint)
+
+    // 5. Footer (Ganz unten)
+    val footerPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        alpha = 135
+        textSize = 24f
+        isFakeBoldText = true
+        letterSpacing = 0.1f
+    }
+    canvas.drawText("🏔️ FREIZEITTICKET TRACKER  •  Saison $season", 90f, 1855f, footerPaint)
 
     return bitmap
 }
@@ -3688,18 +3488,18 @@ fun StoryPreviewCarouselDialog(
     onDismiss: () -> Unit,
     onShare: (android.graphics.Bitmap) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val themes = listOf(
-        StoryTheme.RING_NEON,
-        StoryTheme.RING_GLACIER,
-        StoryTheme.RING_SUNSET,
-        StoryTheme.POSTER_RETRO,
+        StoryTheme.POSTER_SKI,
+        StoryTheme.POSTER_POWDER,
         StoryTheme.POSTER_AURORA,
-        StoryTheme.POSTER_GOLDEN
+        StoryTheme.POSTER_RODEL,
+        StoryTheme.POSTER_SUMMER
     )
 
     val bitmaps = remember(season, personName, visitsCount, savedAmount, ticketPrice, topVenueLabel, topCategoryLabel) {
         themes.map { theme ->
-            generateStoryBitmap(season, personName, visitsCount, savedAmount, ticketPrice, theme, topVenueLabel, topCategoryLabel)
+            generateStoryBitmap(context, season, personName, visitsCount, savedAmount, ticketPrice, theme, topVenueLabel, topCategoryLabel)
         }
     }
 
@@ -3730,7 +3530,7 @@ fun StoryPreviewCarouselDialog(
                 ) {
                     Column {
                         Text("Story-Design wählen", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("${activeTheme.categoryTag} • Wische für 6 Designs", fontSize = 12.sp, color = Color.LightGray)
+                        Text("${activeTheme.categoryTag} • Wische für 5 Motive", fontSize = 12.sp, color = Color.LightGray)
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Rounded.Close, contentDescription = "Schließen", tint = Color.White)
