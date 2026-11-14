@@ -911,7 +911,7 @@ fun generateStoryShareImage(
                 bgTop = "#F8FAFC", bgBottom = "#E2E8F0", cardBg = "#FFFFFF",
                 textPrimary = "#0F172A", textSecondary = "#64748B", accentColor = "#0284C7"
             )
-            StoryTheme.RING_SUNSET -> StoryColors(
+            else -> StoryColors(
                 bgTop = "#31103F", bgBottom = "#1A0B2E", cardBg = "#2D1B4E",
                 textPrimary = "#FFFFFF", textSecondary = "#F9A8D4", accentColor = "#F43F5E"
             )
