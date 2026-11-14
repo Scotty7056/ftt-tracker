@@ -1221,6 +1221,7 @@ fun StatisticsView(viewModel: TrackerViewModel) {
                 }
             }
         }
+    }
 
     if (showThemeChooserDialog) {
         val pName = selectedPerson?.name ?: ""
@@ -1242,7 +1243,6 @@ fun StatisticsView(viewModel: TrackerViewModel) {
             }
         )
     }
-}
 }
 // ==========================================
 // 3. KALENDER & KARTE
