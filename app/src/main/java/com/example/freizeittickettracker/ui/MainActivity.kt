@@ -763,7 +763,7 @@ fun DashboardView(
             ) {
                 Icon(Icons.Rounded.AddLocationAlt, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Besuch manuell Eintr\u00E4gen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text("Besuch manuell eintragen", fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -2224,7 +2224,7 @@ fun ManualVisitDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Besuch manuell Eintr\u00E4gen", fontWeight = FontWeight.Bold, color = AlpineDark) },
+        title = { Text("Besuch manuell eintragen", fontWeight = FontWeight.Bold, color = AlpineDark) },
         text = {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 OutlinedCard(
