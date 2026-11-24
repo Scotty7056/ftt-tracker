@@ -199,6 +199,8 @@ fun MainScreen(
     var visitPendingDeletion by remember { mutableStateOf<VisitEntity?>(null) }
     var visitPendingEdit by remember { mutableStateOf<VisitEntity?>(null) }
     var showBackgroundRationaleDialog by remember { mutableStateOf(false) }
+    var showLocationDisclosureDialog by remember { mutableStateOf(false) }
+    var pendingInitialPermissions by remember { mutableStateOf<Array<String>>(emptyArray()) }
 
     val ticketConfig by viewModel.ticketConfig.collectAsState(initial = TicketConfig())
     val selectedSeason by viewModel.selectedSeason.collectAsState()
@@ -455,6 +457,39 @@ fun MainScreen(
                 persons = personsList,
                 season = currentSeason,
                 onDismiss = { showFamilyDialog = false }
+            )
+        }
+
+        if (showLocationDisclosureDialog) {
+            AlertDialog(
+                onDismissRequest = { showLocationDisclosureDialog = false },
+                icon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = GlacierBlue, modifier = Modifier.size(36.dp)) },
+                title = { Text("Standortzugriff für Partner-Check-in", fontWeight = FontWeight.Bold, color = AlpineDark) },
+                text = {
+                    Text(
+                        "FTT Tracker benötigt Zugriff auf deinen Gerätestandort, um dir die Entfernung zu teilnehmenden Bergbahnen und Partnergebieten anzuzeigen und automatische Besuchs-Check-ins zu ermöglichen.\n\n" +
+                        "Für den automatischen Check-in erfasst die App deinen Standort optional auch dann, wenn die App geschlossen ist oder nicht aktiv genutzt wird.\n\n" +
+                        "Alle Standortdaten werden ausschließlich lokal auf deinem Gerät verarbeitet und nicht an externe Server übertragen."
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showLocationDisclosureDialog = false
+                            if (pendingInitialPermissions.isNotEmpty()) {
+                                basePermissionLauncher.launch(pendingInitialPermissions)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GlacierBlue)
+                    ) {
+                        Text("Verstanden & Weiter")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLocationDisclosureDialog = false }) {
+                        Text("Nicht jetzt", color = Color.Gray)
+                    }
+                }
             )
         }
 
